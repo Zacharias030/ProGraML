@@ -1,16 +1,6 @@
 # Machine learning models.
 
 py_library(
-    name = "base_utils",
-    srcs = ["base_utils.py"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//third_party/py/numpy",
-        "//labm8:app",
-    ],
-)
-
-py_library(
     name = "classifier_base",
     srcs = ["classifier_base.py"],
     data = ["//deeplearning/ncc/published_results:embeddings"],
@@ -30,6 +20,17 @@ py_library(
         "//labm8:system",
         "//third_party/py/numpy",
         "//third_party/py/scikit_learn",
+    ],
+)
+
+py_library(
+    name = "classifier_smoke_tester",
+    testonly = 1,
+    srcs = ["classifier_smoke_tester.py"],
+    visibility = ["//deeplearning/ml4pl/models:__subpackages__"],
+    deps = [
+        "//deeplearning/ml4pl/graphs:graph_database",
+        "//labm8:app",
     ],
 )
 
