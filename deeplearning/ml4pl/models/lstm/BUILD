@@ -19,8 +19,36 @@ py_binary(
         "//deeplearning/ml4pl/bytecode:bytecode_database",
         "//labm8:app",
         "//labm8:humanize",
+        "//labm8:jsonutil",
         "//labm8:prof",
         "//labm8:sqlutil",
+    ],
+)
+
+py_library(
+    name = "graph2seq",
+    srcs = ["graph2seq.py"],
+    deps = [
+        ":bytecode2seq",
+        "//deeplearning/ml4pl/bytecode:bytecode_database",
+        "//deeplearning/ml4pl/graphs:graph_database",
+        "//deeplearning/ml4pl/graphs/unlabelled/cdfg:control_and_data_flow_graph",
+        "//labm8:app",
+        "//third_party/py/keras",
+        "//third_party/py/numpy",
+    ],
+)
+
+py_test(
+    name = "graph2seq_test",
+    srcs = ["graph2seq_test.py"],
+    deps = [
+        ":graph2seq",
+        "//deeplearning/ml4pl/bytecode:bytecode_database",
+        "//deeplearning/ml4pl/graphs:graph_database",
+        "//labm8:app",
+        "//labm8:test",
+        "//third_party/py/pytest",
     ],
 )
 
@@ -33,7 +61,6 @@ py_binary(
         "//deeplearning/ml4pl/graphs:graph_database",
         "//deeplearning/ml4pl/models:classifier_base",
         "//deeplearning/ml4pl/models:log_database",
-        "//deeplearning/ml4pl/models:base_utils",
         "//labm8:app",
         "//labm8:prof",
         "//third_party/py/numpy",
