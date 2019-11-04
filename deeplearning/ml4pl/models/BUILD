@@ -1,6 +1,16 @@
 # Machine learning models.
 
 py_library(
+    name = "base_utils",
+    srcs = ["base_utils.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//labm8:app",
+        "//third_party/py/numpy",
+    ],
+)
+
+py_library(
     name = "classifier_base",
     srcs = ["classifier_base.py"],
     data = ["//deeplearning/ncc/published_results:embeddings"],
@@ -23,19 +33,21 @@ py_library(
     ],
 )
 
-# TODO(cec): Update classifier base tests.
-#py_test(
-#    name = "classifier_base_test",
-#    srcs = ["classifier_base_test.py"],
-#    deps = [
-#        ":classifier_base",
-#        "//labm8:app",
-#        "//labm8:test",
-#        "//third_party/py/numpy",
-#        "//third_party/py/pytest",
-#        "//third_party/py/tensorflow",
-#    ],
-#)
+py_test(
+    name = "classifier_base_test",
+    srcs = ["classifier_base_test.py"],
+    deps = [
+        ":classifier_base",
+        ":log_database",
+        "//deeplearning/ml4pl/graphs:graph_database",
+        "//deeplearning/ml4pl/graphs/unlabelled/cdfg:random_cdfg_generator",
+        "//labm8:app",
+        "//labm8:test",
+        "//third_party/py/numpy",
+        "//third_party/py/pytest",
+        "//third_party/py/tensorflow",
+    ],
+)
 
 py_library(
     name = "classifier_smoke_tester",
