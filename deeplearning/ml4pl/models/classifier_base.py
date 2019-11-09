@@ -7,6 +7,11 @@ import typing
 import numpy as np
 import sklearn.metrics
 import sqlalchemy as sql
+
+import build_info
+from deeplearning.ml4pl.graphs import graph_database
+from deeplearning.ml4pl.graphs.labelled.graph_tuple import graph_batcher
+from deeplearning.ml4pl.models import log_database
 from labm8 import app
 from labm8 import decorators
 from labm8 import humanize
@@ -15,11 +20,6 @@ from labm8 import pbutil
 from labm8 import ppar
 from labm8 import prof
 from labm8 import system
-
-import build_info
-from deeplearning.ml4pl.graphs import graph_database
-from deeplearning.ml4pl.graphs.labelled.graph_tuple import graph_batcher
-from deeplearning.ml4pl.models import log_database
 
 FLAGS = app.FLAGS
 
@@ -199,8 +199,6 @@ class ClassifierBase(object):
 
     app.Log(1, "Model flags: %s", jsonutil.format_json(self.ModelFlagsToDict()))
 
-    app.Log(1, "All Flags set in this run: \n%s", FLAGS.flags_into_string())
-
     random.seed(FLAGS.random_seed)
     np.random.seed(FLAGS.random_seed)
 
@@ -265,7 +263,6 @@ class ClassifierBase(object):
       y_pred = np.argmax(predictions, axis=1)
       accuracies = y_true == y_pred
 
-      # print("self.labels: ", self.labels)
       log.accuracy = sklearn.metrics.accuracy_score(y_true, y_pred)
       log.precision = sklearn.metrics.precision_score(
           y_true,
@@ -284,14 +281,19 @@ class ClassifierBase(object):
           average=FLAGS.batch_scores_averaging_method)
 
       log.accuracy = accuracies.mean()
-      log.accuracies = accuracies
-      log.predictions = predictions
+
+      # Only create a batch log for test runs.
+      if epoch_type == 'test':
+        log.batch_log = log_database.BatchLog()
+        log.graph_indices = log._graph_indices
+        log.accuracies = accuracies
+        log.predictions = predictions
 
       epoch_accuracies.append(log.accuracy)
 
       log.elapsed_time_seconds = time.time() - batch_start_time
 
-      app.Log(2, "%s", log)
+      app.Log(1, "%s", log)
       # Create a new database session for every batch because we don't want to
       # leave the connection lying around for a long time (they can drop out)
       # and epochs may take O(hours). Alternatively we could store all of the
