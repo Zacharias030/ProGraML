@@ -70,6 +70,25 @@ py_binary(
         "//deeplearning/ml4pl/graphs/labelled/graph_tuple:graph_batcher",
         "//deeplearning/ml4pl/models:classifier_base",
         "//deeplearning/ml4pl/models:log_database",
+        "//deeplearning/ml4pl/models:base_utils",
+        "//labm8:app",
+        "//labm8:prof",
+        "//third_party/py/numpy",
+        "//third_party/py/tensorflow",
+    ],
+)
+
+py_binary(
+    name = "lstm_node_classifier",
+    srcs = ["lstm_node_classifier.py"],
+    deps = [
+        ":graph2seq",
+        "//deeplearning/ml4pl/bytecode:bytecode_database",
+        "//deeplearning/ml4pl/graphs:graph_database",
+        "//deeplearning/ml4pl/graphs/labelled/graph_tuple:graph_batcher",
+        "//deeplearning/ml4pl/models:classifier_base",
+        "//deeplearning/ml4pl/models:log_database",
+        "//deeplearning/ml4pl/models:base_utils",
         "//labm8:app",
         "//labm8:prof",
         "//third_party/py/numpy",
