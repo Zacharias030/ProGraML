@@ -199,6 +199,8 @@ class ClassifierBase(object):
 
     app.Log(1, "Model flags: %s", jsonutil.format_json(self.ModelFlagsToDict()))
 
+    app.Log(1, "All Flags set in this run: \n%s", FLAGS.flags_into_string())
+
     random.seed(FLAGS.random_seed)
     np.random.seed(FLAGS.random_seed)
 
@@ -293,7 +295,7 @@ class ClassifierBase(object):
 
       log.elapsed_time_seconds = time.time() - batch_start_time
 
-      app.Log(1, "%s", log)
+      app.Log(2, "%s", log)
       # Create a new database session for every batch because we don't want to
       # leave the connection lying around for a long time (they can drop out)
       # and epochs may take O(hours). Alternatively we could store all of the
@@ -426,13 +428,12 @@ class ClassifierBase(object):
 
       # Add the new checkpoint.
       session.add(
-          log_database.ModelCheckpointMeta(
+          log_database.ModelCheckpointMeta.Create(
               run_id=self.run_id,
               epoch=self.epoch_num,
               global_step=self.global_training_step,
               validation_accuracy=validation_accuracy,
-              model_checkpoint=log_database.ModelCheckpoint(
-                  pickled_data=pickle.dumps(data_to_save))))
+              data=data_to_save))
 
   def LoadModel(self, run_id: str, epoch_num: int) -> None:
     """Load and restore the model from the given model file.
