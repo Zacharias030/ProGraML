@@ -1,5 +1,4 @@
 """A gated graph neural network classifier."""
-import math
 import typing
 from typing import Callable
 from typing import Iterable
@@ -20,7 +19,6 @@ from deeplearning.ml4pl.models import batch as batches
 from deeplearning.ml4pl.models import classifier_base
 from deeplearning.ml4pl.models import epoch
 from deeplearning.ml4pl.models import run
-from deeplearning.ml4pl.models.ggnn import ggnn_config
 from deeplearning.ml4pl.models.ggnn.ggnn_config import GGNNConfig
 from deeplearning.ml4pl.models.ggnn.ggnn_modules import GGNNModel
 from labm8.py import app
@@ -190,7 +188,7 @@ class Ggnn(classifier_base.ClassifierBase):
       has_graph_labels=self.graph_db.graph_y_dimensionality > 0,
     )
 
-    inst2vec_embeddings = node_encoder.GraphEncoder().embeddings_tables[0]
+    inst2vec_embeddings = node_encoder.GraphNodeEncoder().embeddings_tables[0]
     inst2vec_embeddings = torch.from_numpy(
       np.array(inst2vec_embeddings, dtype=np.float32)
     )
@@ -248,8 +246,8 @@ class Ggnn(classifier_base.ClassifierBase):
     try:
       disjoint_graph = next(batcher)
     except StopIteration:
-      # We have run out of graphs, return an empty batch.
-      return batches.Data(graph_ids=[], data=None)
+      # We have run out of graphs.
+      return batches.EndOfBatches()
 
     # Workaround for the fact that graph batcher may read one more graph than
     # actually gets included in the batch.
@@ -258,11 +256,15 @@ class Ggnn(classifier_base.ClassifierBase):
     else:
       graphs = graph_iterator.graphs_read
 
-    # discard single graph batches in train epoch.
-    # We might as well do that in any ggnn application with graph-level labels
-    if len(graphs) <= 1 and epoch_type == epoch.Type.TRAIN \
-        and disjoint_graph.graph_y_dimensionality:
-      return batches.Data(graph_ids=[], data=None)
+    # Discard single-graph batches during training when there are graph
+    # features. This is because we use batch normalization on incoming features,
+    # and batch normalization requires > 1 items to normalize.
+    if (
+      len(graphs) <= 1
+      and epoch_type == epoch.Type.TRAIN
+      and disjoint_graph.graph_x_dimensionality
+    ):
+      return batches.EmptyBatch()
 
     return batches.Data(
       graph_ids=[graph.id for graph in graphs],
@@ -302,6 +304,22 @@ class Ggnn(classifier_base.ClassifierBase):
       filters.append(
         lambda: graph_tuple_database.GraphTuple.data_flow_steps
         <= self.message_passing_step_count
+      )
+
+    # If we are batching my maximum node count and skipping graphs that are
+    # larger than this, we can apply that filter to the SQL query now, rather
+    # than reading the graphs and ignoring them later. This ensures that when
+    # --max_{train,val}_per_epoch is set, the number of graphs that get used
+    # matches the limit.
+    if (
+      FLAGS.graph_batch_node_count
+      and FLAGS.max_node_count_limit_handler == "skip"
+    ):
+      filters.append(
+        lambda: (
+          graph_tuple_database.GraphTuple.node_count
+          <= FLAGS.graph_batch_node_count
+        )
       )
 
     return super(Ggnn, self).GraphReader(
@@ -391,7 +409,10 @@ class Ggnn(classifier_base.ClassifierBase):
 
     # maybe fetch more inputs.
     if disjoint_graph.has_graph_y:
-      assert (epoch_type != epoch.Type.TRAIN or disjoint_graph.disjoint_graph_count > 1), f"graph_count is {disjoint_graph.disjoint_graph_count}"
+      assert (
+        epoch_type != epoch.Type.TRAIN
+        or disjoint_graph.disjoint_graph_count > 1
+      ), f"graph_count is {disjoint_graph.disjoint_graph_count}"
       num_graphs = torch.tensor(disjoint_graph.disjoint_graph_count).to(
         self.dev, torch.long
       )
