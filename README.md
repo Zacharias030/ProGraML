@@ -1,242 +1,391 @@
-# My PhD
+# Graph-based Machine Learning for Programming Languages
 
-<!-- repo size -->
-<a href="https://github.com/ChrisCummins/phd">
-  <img src="https://img.shields.io/github/repo-size/ChrisCummins/phd.svg">
-</a>
-<!-- commit counter -->
-<a href="https://github.com/ChrisCummins/phd">
-  <img src="https://img.shields.io/github/commit-activity/y/ChrisCummins/phd.svg?color=yellow">
-</a>
-<!-- Better code -->
-<a href="https://bettercodehub.com/results/ChrisCummins/phd">
-  <img src="https://bettercodehub.com/edge/badge/ChrisCummins/phd?branch=master">
-</a>
-<!-- Travis CI -->
-<a href="https://github.com/ChrisCummins/phd">
-  <img src="https://img.shields.io/travis/ChrisCummins/phd/master.svg">
-</a>
+## Setup
 
-A monolothic repository for (almost) everything I have done while at the University of Edinburgh. Living an #open life.
+### Requirements
 
+* Ubuntu >= 16.04 or macOS >= 10.14.
+* Python >= 3.6.
+* Bazel >= 0.28.0.
+* MySQL >= 5.7.
 
-##  Publications
-
-1. Chris Cummins, Pavlos Petoumenos, Alastair Murray, Hugh Leather.
-   "**Compiler Fuzzing through Deep Learning**".
-   ISSTA '18.
-   [[source code]](/docs/2018_07_issta).
-   [[pdf]](https://chriscummins.cc/pub/2018-issta.pdf).
-   Build command: `$ bazel build //docs/2018_07_issta`.
-1. Chris Cummins, Pavlos Petoumenos, Alastair Murray, Hugh Leather.
-   "**DeepSmith: Compiler Fuzzing through Deep Learning**".
-   ACACES '18.
-   [[source code]](/docs/2018_07_acaces).
-   [[pdf]](https://chriscummins.cc/pub/2018-acaces.pdf).
-   Build command: `$ bazel build //docs/2018_07_acaces`.
-1. Chris Cummins, Pavlos Petoumenos, Zheng Wang, Hugh Leather.
-   "**End-to-end Deep Learning of Optimization Heuristics**".
-   PACT '17.
-   [[source code]](https://github.com/ChrisCummins/paper-end2end-dl/).
-   [[pdf]](https://github.com/ChrisCummins/paper-end2end-dl/raw/master/paper.pdf).
-   Build command: `$ bazel build //docs/2017_09_pact`.
-1. Chris Cummins, Pavlos Petoumenos, Zheng Wang, Hugh Leather.
-   "**Synthesizing Benchmarks for Predictive Modeling**".
-   CGO '17.
-   [[source code]](https://github.com/ChrisCummins/paper-synthesizing-benchmarks/).
-   [[pdf]](https://github.com/ChrisCummins/paper-synthesizing-benchmarks/raw/master/paper.pdf).
-   [[acm]](https://dl.acm.org/citation.cfm?id=3049843).
-   Build command: `$ bazel build //docs/2017_02_cgo`.
-1. Chris Cummins, Pavlos Petoumenos, Michel Steuwer, Hugh Leather.
-   "**Autotuning OpenCL Workgroup Sizes**". ACACES '16.
-   [[source code]](/docs/2016_07_acaces).
-   Build command: `$ bazel build //docs/2016_07_acaces`.
-1. Chris Cummins, Pavlos Petoumenos, Michel Steuwer, Hugh Leather.
-   "**Towards Collaborative Performance Tuning of Algorithmic Skeletons**".
-   HLPGPU '16, HiPEAC.
-   [[source code]](https://github.com/ChrisCummins/paper-towards-collaborative-performance-tuning).
-   [[pdf]](https://github.com/ChrisCummins/paper-towards-collaborative-performance-tuning/raw/master/paper.pdf).
-   Build command: `$ bazel build //docs/2016_01_hlpgpu`.
-1. Chris Cummins, Pavlos Petoumenos, Michel Steuwer, Hugh Leather.
-   "**Autotuning OpenCL Workgroup Size for Stencil Patterns**".
-   ADAPT '16, HiPEAC.
-   [[source code]](https://github.com/ChrisCummins/paper-autotuning-opencl-wgsize).
-   [[pdf]](https://github.com/ChrisCummins/paper-autotuning-opencl-wgsize/raw/master/paper.pdf).
-   [[arxiv]](https://arxiv.org/abs/1511.02490).
-   Build command: `$ bazel build //docs/2016_01_adapt`.
-1. Chris Cummins. "**Autotuning Stencils Codes with Algorithmic Skeletons**".
-   MSc Thesis, 2015. The University of Edinburgh.
-   [[source code]](/docs/2015_08_msc_thesis).
-   Build command: `$ bazel build //docs/2015_08_msc_thesis`.
-
-
-## Talks
-
-1. Chris Cummins. "**Compiler Fuzzing through Deep Learning**", 3rd August, 2018.
-   Codeplay, Edinburgh, Scotland.
-   [[files]](/talks/2018_08_codeplay).
-   [[slides]](https://speakerdeck.com/chriscummins/compiler-fuzzing-through-deep-learning-issta-18).
-1. Chris Cummins. "**Machine Learning for Compilers**", 20th July, 2018.
-   Workshop on Introspective Systems for Automatically Generating Tests (ISAGT),
-   Amsterdam, Netherlands.
-   [[files]](/talks/2018_07_isagt).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2018_07_isagt/2018_07_isagt.pdf).
-1. Chris Cummins. "**Compiler Fuzzing through Deep Learning**", 16th July, 2018.
-   ACM SIGSOFT International Symposium on Software Testing and Analysis (ISSTA), Amsterdam, Netherlands.
-   [[files]](/talks/2018_07_issta).
-   [[slides]](https://speakerdeck.com/chriscummins/compiler-fuzzing-through-deep-learning-issta-18).
-1. Chris Cummins. "**End-to-end Deep Learning of Optimization Heuristics**", 23rd March, 2018.
-   Facebook, Menlo Park.
-   [[files]](/talks/2018_03_facebook).
-   [[slides]](https://speakerdeck.com/chriscummins/end-to-end-deep-learning-of-optimization-heuristics-pact-17).
-1. Chris Cummins. "**End-to-end Deep Learning of Optimization Heuristics**", 2nd Feb, 2018.
-   Google, Mountain View.
-   [[files]](/talks/2018_02_google).
-   [[slides]](https://speakerdeck.com/chriscummins/end-to-end-deep-learning-of-optimization-heuristics-pact-17).
-1. Chris Cummins. "**Second Year Progression Review**", 18th Dec, 2017.
-   The University of Edinburgh, Scotland.
-   [[files]](/talks/2017_12_second_year_review).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2017-12-second-year-review/2017-12-second-year-review.pdf).
-1. Chris Cummins. "**End-to-end Deep Learning of Optimization Heuristics**", 4th Oct, 2017.
-   The University of Edinburgh, Scotland.
-   [[files]](/talks/2017_10_ppar).
-   [[slides]](https://speakerdeck.com/chriscummins/end-to-end-deep-learning-of-optimization-heuristics-pact-17).
-1. Chris Cummins. "**End-to-end Deep Learning of Optimization Heuristics**", 12th Sep, 2017.
-   International Conference on Parallel Architectures and Compilation Techniques (PACT), Portland, Oregon, USA.
-   [[files]](/talks/2017_09_pact).
-   [[slides]](https://speakerdeck.com/chriscummins/end-to-end-deep-learning-of-optimization-heuristics-pact-17).
-1. Chris Cummins. "**Deep Learning in Compilers**", 14th Jun, 2017.
-   The University of Edinburgh, Scotland.
-   [[files]](/talks/2017_06_ppar).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2017-06-ppar/2017-06-ppar.pdf). [[transcript]](https://chriscummins.cc/2017/deep-learning-in-compilers/).
-1. Chris Cummins. "**Using Deep Learning to Generate Human-like Code**", 22nd April, 2017.
-   Scottish Programming Languages Seminar, University of St.
-   Andrews, Scotland.
-   [[files]](/talks/2017_03_spls).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2017-03-spls/2017-03-spls.pdf).
-1. Chris Cummins. "**Synthesizing Benchmarks for Predictive Modeling**", 6th Febuary, 2017.
-   International Symposium on Code Generationand Optimization (CGO), Austin, Texas, USA.
-   [[files]](/talks/2017_02_cgo).
-   [[slides]](https://speakerdeck.com/chriscummins/synthesizing-benchmarks-for-predictive-modelling-cgo-17).
-1. Chris Cummins. "**Machine Learning & Compilers**", 9th September, 2016.
-   Codeplay, Edinburgh, Scotland.
-   [[files]](/talks/2017_02_cgo).
-   [[slides]](https://speakerdeck.com/chriscummins/machine-learning-and-compilers).
-1. Chris Cummins. "**Building an AI that Codes**", 22nd July, 2016.
-   Ocado Technology, Hatfield, England.
-   [[files]](/talks/2016_07_ocado).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2016-07-ocado/2016-07-ocado.pdf).
-1. Chris Cummins.
-   "**All the OpenCL on GitHub: Teaching an AI to code, one character at a time**", 19th May, 2016.
-   Amazon Development Centre, Edinburgh, Scotland.
-   [[files]](/talks/2016_05_amazon).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2016-05-amazon/2016-05-amazon.pdf).
-1. Chris Cummins. "**Autotuning and Algorithmic Skeletons**", Wed 10th Feb, 2016.
-   The University of Edinburgh, Scotland.
-   [[files]](/talks/2016_02_ppar).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2016-02-ppar/2016-02-ppar.pdf).
-1. Chris Cummins. "**Towards Collaborative Performance Tuning of Algorithmic Skeletons**", Tues 19th Jan, 2016.
-   HLPGPU, HiPEAC, Prague.
-   [[files]](/talks/2016_01_hlpgpu).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2016-01-hlpgpu/2016-01-hlpgpu.pdf).
-1. Chris Cummins. "**Autotuning OpenCL Workgroup Size for Stencil Patterns**", Mon 18th Jan, 2016.
-   ADAPT, HiPEAC, Prague.
-   [[files]](/talks/2016_01_adapt).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2016-01-adapt/2016-01-adapt.pdf).
-1. Chris Cummins.
-   "**Towards Collaborative Performance Tuning of Algorithmic Skeletons**", Thurs 14th Jan, 2016.
-   The University of Edinburgh, Scotland.
-   [[files]](/talks/2016_01_hlpgpu).
-   [[pdf]](https://github.com/ChrisCummins/phd/raw/master/talks/2016-01-hlpgpu/2016-01-hlpgpu.pdf).
-
-
-## Misc
-
-1. **Curriculum Vitae**.
-   [[source code]](/docs/cv).
-   [[pdf]](https://chriscummins.cc/cv.pdf).
-   [[html]](https://chriscummins.cc/cv/).
-   Build command: `$ bazel build //docs/cv`.
-1. Chris Cummins, Pavlos Petoumenos, Michel Steuwer, Hugh Leather.
-   "**Collaborative Autotuning of Algorithmic Skeletons for GPUs and CPUs**".
-   Incomplete journal version of ADAPT and HLPGPU papers.
-   [[source code]](/docs/2016_12_wip_taco).
-   Build command: `$ bazel build //docs/2016_12_wip_taco`.
-1. Chris Cummins. "**Deep Learning for Compilers**". PhD First Year Review
-   Document, 2016.
-   [[source code]](/docs/2016_11_first_year_review).
-   Build command: `$ bazel build //docs/2016_11_first_year_review`.
-1. Chris Cummins, Hugh Leather. "**Autotuning OpenCL Workgroup Sizes**".
-   Rejected submission for PACT'16 Student Research Competition.
-   [[source code]](/docs/2016_07_pact).
-   Build command: `$ bazel build //docs/2016_07_pact`.
-1. Chris Cummins, Pavlos Petoumenos, Michel Steuwer, Hugh Leather.
-   "**Autotuning OpenCL Workgroup Sizes**".
-   Submission for PLDI'16 Student Poster Session.
-   [[source code]](/docs/2016_06_pldi).
-   Build command: `$ bazel build //docs/2016_06_pldi`.
-1. Chris Cummins. "**Autotuning and Skeleton-aware Compilation**".
-   PhD Progression Review, 2015.
-   [[source code]](/docs/2015_09_progression-review).
-   Build command: `$ bazel build //docs/2015_09_progression_review`.
-
-
-<h2>
-   Building the code
-</h2>
-
-I use [Bazel](https://bazel.build) as my build system of choice, with a
-preliminary [configure](/configure) script to setup the build. I'm gradually
-working towards a completely hermetic build, but for now there remains a couple
-of dependencies on the host C++ toolchain and Python runtime.
-
-This project can only be built on a modern version of Ubuntu Linux or macOS.
-This is a requirement I inherit from my dependencies, which eschew Windows and
-other Linux distros. Fortunately, you can use a
-[Docker](https://www.docker.com/community-edition) image and follow the Ubuntu
-instructions:
-
-```sh
-$ docker run -it ubuntu:18.04 /bin/bash
-```
-
-If you have success building this project on other platforms, I'd love to hear
-about it and accept patches.
-
-#### Ubuntu/MacOS instructions
-
-Configure the build and answer the yes/no questions. The default answers should
-be fine:
+### Installation
 
 ```sh
 $ ./configure
+# Answer yes/no questions. The defaults should be fine.
 ```
 
-Note that CUDA support requires CUDA to have been installed separately,
-see the [TensorFlow build docs](https://www.tensorflow.org/install/) for
-instructions. CUDA support has only been tested for Linux builds, not macOS or
-Docker containers.
-
-The configure process generates a `bootstrap.sh` script which will install the
-required dependent packages. Since installing these packages will affect the
-global state of your system, and may requires root access, inspect this script
-carefully. Once you're happy to proceed, run it using:
+Run the test suite:
 
 ```sh
-$ bash ./bootstrap.sh
+$ bazel test //deeplearning/ml4pl/...
 ```
 
-Finally, we must set up the shell environment for running bazel. The file `.env`
-is created by the configure process and must be sourced for every shell we want
-to use bazel with:
+#### Setup a database
+
+Create a file with the username, password, and hostname of your MySQL server in the form:
 
 ```sh
-$ source $PWD/.env
+$ cat ~/mysql.txt
+mysql://user:pass@hostname/
 ```
 
-Now build or test whatever bazel targets you'd like. Use `bazel query //...` to
-list the available targets. E.g. to run the entire test suite, run:
+Then export the path of this file with a `file://` prefix:
 
-```bash
-$ bazel test //...
+```sh
+$ export DB="file://$HOME/mysql.txt"
 ```
+
+## Usage
+
+### Step 1: Gather Intermediate Representations
+
+TODO(github.com/ChrisCummins/ProGraML/issues/7). This is currently being 
+refactored, and the existing databases have been migrated from an old schema.
+
+
+### Step 2: Generate Program Graphs
+
+TODO(github.com/ChrisCummins/ProGraML/issues/2): This is currently being 
+refactored, and the existing databases have been migrated from an old  schema.
+
+
+### Step 3: Create Labelled Graphs
+
+#### Data Flow Analyses
+
+Generate a database of graphs labelled with data flow analyses using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/labelled:flaky_make_data_flow_analysis_dataset -- \
+    --proto_db="$DB?programl_graph_protos" \
+    --graph_db="$DB?programl_$ANALYSIS" \
+    --analysis=$ANALYSIS
+```
+
+Where `$ANALYSIS` is one of:
+ 
+ 1. `reachability` Control flow reachability.
+ 2. `domtree` Dominator trees.
+ 3. `liveness` Live-out variables.
+ 4. `datadep` Data dependencies.
+ 5. `subexpressions` Global common subexpressions.
+ 
+Split one of the datasets intro {train,val,test} data using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/labelled/dataflow:split -- \
+    --graph_db="$DB?programl_reachability" \
+    --ir_db="$DB?programl_ir"
+```
+
+Then copy those splits to the other datasets using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/labelled/dataflow:split -- \
+    --graph_db="$DB?programl_reachability" \
+    --copy_splits_to="$DB?programl_domtree"
+
+$ bazel run //deeplearning/ml4pl/graphs/labelled/dataflow:split -- \
+    --graph_db="$DB?programl_reachability" \
+    --copy_splits_to="$DB?programl_liveness"
+
+$ bazel run //deeplearning/ml4pl/graphs/labelled/dataflow:split -- \
+    --graph_db="$DB?programl_reachability" \
+    --copy_splits_to="$DB?programl_datadep"
+
+$ bazel run //deeplearning/ml4pl/graphs/labelled/dataflow:split -- \
+    --graph_db="$DB?programl_reachability" \
+    --copy_splits_to="$DB?programl_subexpressions"
+```
+
+#### Heterogeneous Device Mapping
+
+We provide a dataset of heterogeneous device mapping benchmarks for two devices:
+`nvidia_gtx_960` and `amd_tahiti_7970`. Generate the labelled datasets using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/labelled/devmap:make_devmap_dataset -- \
+    --ir_db="$DB?programl_ir" \
+    --proto_db="$DB?programl_graph_protos" \
+    --graph_db="$DB?programl_devmap_amd" \
+    --gpu='amd_tahiti_7970'
+
+$ bazel run //deeplearning/ml4pl/graphs/labelled/devmap:make_devmap_dataset -- \
+    --ir_db="$DB?programl_ir" \
+    --proto_db="$DB?programl_graph_protos" \
+    --graph_db="$DB?programl_devmap_nvidia" \
+    --gpu='nvidia_gtx_960'
+```
+
+We use stratified 10-fold cross-validation to evaluate models on these datasets 
+due to their small size. Create random 10-fold splits of the datasets using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/labelled/devmap:split -- \
+    --graph_db="$DB?programl_devmap_amd" \
+    --k=10
+
+$ bazel run //deeplearning/ml4pl/graphs/labelled/devmap:split -- \
+    --graph_db="$DB?programl_devmap_nvidia" \
+    --k=10
+```
+
+### Step 4: Train Models
+
+Each of the models accept a common set of configuration flags, which you can see
+using `--helpfull`. Some of the relevant options are:
+
+* `--epoch_count`: The number of epochs to run the train/val loop for.
+* `--test_on`: Determine when to run the test set. Possible values: none (never 
+  run the test set), every (test at the end of every epoch), improvement (test 
+  only when validation accuracy improves), improvent_and_last (test when 
+  validation accuracy improves, and on the last epoch), or best (restore the 
+  model with the best validation accuracy after training and test that).
+* `--stop_at`: Permit the train/val/test loop to terminate before `epoch_count`
+  iterations have completed. Valid options are: `val_acc=<float>` (stop if 
+  validation accuracy reaches the given value in the range [0,1]), 
+  `elapsed=<int>` (stop if the given number of seconds have elapsed, excluding 
+  the final test epoch if `--test_on=best` is set), or `patience=<int>` (stop if
+  <int> epochs have been performed without an improvement in validation 
+  accuracy. Multiple options can be combined in a comma-separated list, e.g.
+  `--stop_at=val_acc=.9999,elapsed=21600,patience=10` meaning stop if validation
+  accuracy meets 99.99% or if 6 hours have elapsed or if 10 epochs have been
+  performed without an improvement in validation accuracy.
+* `--keep_checkpoints=all`: One of `{all,last}`
+* `--detailed_batch_types=val,test`: A list of epoch types to make detailed batch 
+logs for, where the epoch type is one of `{train,val,test}`. Detailed batch logs
+store more information about the model behavior, but are not required for 
+computing aggregate model performance and can
+grow large.
+* `--keep_detailed_batches=all`: Determines whether to remove old detailed 
+batches over the lifetime of a model. Valid options are `all`: keep all detailed
+batches, or `last_epoch`: delete old detailed batches at the end of every epoch.
+* `--tag=<string>`: An arbitrary string which can be used for grouping the 
+results of multiple models when aggregating results.
+* `--noreuse_tag`: When setting a `--tag` for a run, check to see that the tag
+is unique, else raise an error. 
+
+#### Data Flow Analyses
+
+
+##### Zero-R
+
+Train and evaluate a Zero-R model using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/models/zero_r -- \
+    --graph_db="$DB?programl_${analysis}_graphs" \
+    --log_db="$DB?programl_dataflow_logs" \
+    --batch_scores_averaging_method=binary \
+    --max_train_per_epoch=10000 \
+    --max_val_per_epoch=1000 \
+    --epoch_count=1 \
+    --tag=dataflow_${analysis}_zero_r
+```
+
+
+##### LSTM
+
+Train and evaluate an statement-level LLVM IR LSTM classifier using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/models/lstm -- \
+    --graph_db="$DB?programl_${analysis}_graphs" \
+    --proto_db="$DB?programl_graph_protos" \
+    --ir_db="$DB?programl_ir" \
+    --log_db="$DB?programl_dataflow_logs" \
+    --epoch_count=300 \
+    --stop_at=val_acc=.9999,time=21600 \
+    --padded_sequence_length=10000 \
+    --padded_node_sequence_length=5000 \
+    --batch_size=64 \
+    --max_train_per_epoch=10000 \
+    --max_val_per_epoch=10000 \
+    --test_on=best \
+    --batch_scores_averaging_method=binary \
+    --tag=dataflow_${analysis}_lstm_ir
+```
+
+Useful configuration options are:
+
+* `--padded_sequence_length=5000` The number of tokens to pad/truncate 
+  encoded text sequences to.
+* `--padded_nodes_sequence_length=5000` The number of nodes to pad/truncate
+  segmented encoded text sequences to.
+
+
+##### GGNN
+
+Train and evaluate a GGNN using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/models/ggnn -- \
+    --graph_db="$DB?programl_${analysis}_graphs" \
+    --log_db="$DB?programl_dataflow_logs" \
+    --epoch_count=300 \
+    --stop_at=val_acc=.9999,time=21600 \
+    --graph_batch_node_count=15000 \
+    --max_node_count_limit_handler="skip" \
+    --max_train_per_epoch=10000 \
+    --max_val_per_epoch=10000 \
+    --batch_scores_averaging_method=binary \
+    --detailed_batch_types=test \
+    --layer_timesteps=30 \
+    --test_on=best \
+    --tag=dataflow_${analysis}_ggnn
+```
+
+Useful configuration options are:
+
+* `--graph_batch_node_count=15000` The maximum number of nodes to include in a
+  disjoint batch of graphs.
+
+#### Heterogeneous Device Mapping
+
+##### Zero-R
+
+```sh
+$ bazel run //deeplearning/ml4pl/models/zero_r -- \
+    --graph_db="$DB?programl_devmap_amd" \
+    --log_db="$DB?programl_devmap_logs" \
+    --k_fold \
+    --epoch_count=1 \
+    --tag=devmap_amd_zero_r
+```
+
+##### LSTM
+
+Train an evaluate the LSTM_{OpenCL} model using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/models/lstm -- \
+    --graph_db="$DB?programl_devmap_amd" \
+    --log_db="$DB?programl_devmap_logs" \
+    --epoch_count=50 \
+    --padded_sequence_length=1024 \
+    --ir2seq=opencl \
+    --test_on=improvement_and_last \
+    --k_fold \
+    --epoch_count=1 \
+    --tag=devmap_amd_lstm_opencl
+```
+
+Train an evaluate the LSTM_{IR} model using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/models/lstm -- \
+    --graph_db="$DB?programl_devmap_amd" \
+    --log_db="$DB?programl_devmap_logs" \
+    --epoch_count=50 \
+    --padded_sequence_length=15000 \
+    --ir2seq=llvm \
+    --test_on=improvement_and_last \
+    --k_fold \
+    --epoch_count=1 \
+    --tag=devmap_amd_lstm_ir
+```
+
+```sh
+$ bazel run //deeplearning/ml4pl/models/lstm -- \
+    --graph_db="$DB?programl_devmap_amd" \
+    --log_db="$DB?programl_devmap_logs" \
+    --epoch_count=50 \
+    --padded_sequence_length=15000 \
+    --ir2seq=inst2vec \
+    --test_on=improvement_and_last \
+    --k_fold \
+    --epoch_count=1 \
+    --tag=devmap_amd_lstm_inst2vec
+```
+
+##### GGNN
+
+```sh
+$ bazel run //deeplearning/ml4pl/models/ggnn -- \
+    --graph_db="$DB?programl_devmap_amd" \
+    --log_db="$DB?programl_devmap_logs" \
+    --graph_batch_node_count=15000 \
+    --k_fold \
+    --tag=devmap_amd_ggnn
+```
+
+### Step 5: Analyze Results
+
+Export CSV files from a log database using:
+
+```sh
+$ bazel run //deeplearning/ml4pl/models:export_logs -- \
+    --log_db="$DB?programl_logs" \
+    --csv_dir=/tmp/logs/csvs
+```
+
+### Debugging
+
+Many of the utility libraries are executable as binaries to produce data useful
+for debugging.
+
+#### Print Stats of a database
+
+A database of unlabelled program graphs:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/unlabelled:unlabelled_graph_database -- \
+    --proto_db="$DB?programl_graph_protos"
+```
+
+A labelled graph database:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/labelled:graph_tuple_database -- \
+    --graph_db="$DB?programl_graph_tuples"
+```
+
+A log database:
+
+```sh
+$ bazel run //deeplearning/ml4pl/models:log_database -- \
+    --log_db="$DB?programl_logs"
+```
+
+#### Dump pickled graph tuples from a database
+
+Read a database of graphs and dump to pickled graph tuples:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/labelled:graph_database_reader -- \
+    --graph_db="$DB?programl_graph_tuples" \
+    --graph_reader_outdir="$HOME/programl/graph_tuples"
+```
+
+#### Dump pickled graph tuple batches from a database
+
+Assemble batches of disjoint graphs and dump to pickled graph tuples:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/labelled:graph_batcher -- \
+    --graph_db="$DB?programl_graph_tuples" \
+    --graph_batch_outdir="$HOME/programl/graph_batches"
+```
+
+#### Visualizing graphs
+
+Create graphviz graphs from a pickled graph tuple:
+
+```sh
+$ bazel run //deeplearning/ml4pl/graphs/labelled:graph_tuple_viz -- \
+    --graph_tuple="$HOME/programl/graph_tuples/graph_tuple_00001.pickle" \
+    > $HOME/programl/graph_tuples/graph_tuple_00001.dot
+```
+
+## Contributing
+
+Pull requests and bug reports welcome. If modifying or adding code, please add
+tests. The most helpful way to report a bug is to submit a pull request which
+adds a failing test case that reproduces the bug.
+
+## License
+
+Copyright 2019 the ProGraML authors and released under the terms of the Apache
+Version 2.0 license. See LICENSE.
