@@ -16,6 +16,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@io_bazel_rules_docker//python3:image.bzl", "py3_image")
+
 py_library(
     name = "call_graph",
     srcs = ["call_graph.py"],
@@ -35,6 +37,7 @@ py_library(
     visibility = ["//deeplearning/ml4pl:__subpackages__"],
     deps = [
         ":call_graph",
+        ":llvm_statements",
         ":node_encoder",
         "//compilers/llvm:opt_util",
         "//deeplearning/ml4pl/graphs:nx_utils",
@@ -50,6 +53,7 @@ py_test(
     srcs = ["graph_builder_test.py"],
     deps = [
         ":graph_builder",
+        "//deeplearning/ml4pl/graphs:programl_pb_py",
         "//labm8/py:test",
         "//third_party/py/networkx",
     ],
@@ -57,11 +61,12 @@ py_test(
 
 py_test(
     name = "graph_builder_regression_test",
-    size = "enormous",
+    timeout = "long",
     srcs = ["graph_builder_regression_test.py"],
     data = ["//deeplearning/ml4pl/testing/data/bytecode_regression_tests:bytecodes"],
     deps = [
         ":graph_builder",
+        "//deeplearning/ml4pl/graphs:programl",
         "//labm8/py:fs",
         "//labm8/py:test",
     ],
@@ -72,10 +77,19 @@ py_binary(
     srcs = ["llvm2graph.py"],
     deps = [
         ":graph_builder",
+        "//deeplearning/ml4pl/graphs:programl",
         "//deeplearning/ml4pl/graphs:programl_pb_py",
         "//labm8/py:app",
         "//labm8/py:pbutil",
     ],
+)
+
+py3_image(
+    name = "llvm2graph_image",
+    srcs = ["llvm2graph.py"],
+    base = "@phd_base//image",
+    main = "llvm2graph.py",
+    deps = [":llvm2graph"],
 )
 
 py_library(
@@ -83,6 +97,7 @@ py_library(
     srcs = ["llvm_statements.py"],
     deps = [
         "//compilers/llvm:opt_util",
+        "//deeplearning/ml4pl/graphs:nx_utils",
         "//deeplearning/ml4pl/graphs:programl_pb_py",
         "//deeplearning/ml4pl/graphs/unlabelled/llvm2graph/cfg:llvm_util",
         "//deeplearning/ncc:rgx_utils",
@@ -92,6 +107,16 @@ py_library(
         "//labm8/py:decorators",
         "//third_party/py/networkx",
         "//third_party/py/numpy",
+    ],
+)
+
+py_test(
+    name = "llvm_statements_test",
+    srcs = ["llvm_statements_test.py"],
+    deps = [
+        ":llvm_statements",
+        "//deeplearning/ml4pl/graphs:programl",
+        "//labm8/py:test",
     ],
 )
 

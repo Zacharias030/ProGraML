@@ -100,13 +100,13 @@ py_test(
     name = "classifier_base_test",
     size = "enormous",
     srcs = ["classifier_base_test.py"],
+    shard_count = 8,
     deps = [
         ":batch",
         ":classifier_base",
         ":epoch",
         ":log_database",
         ":logger",
-        "//deeplearning/ml4pl:run_id",
         "//deeplearning/ml4pl/graphs/labelled:graph_tuple_database",
         "//deeplearning/ml4pl/testing:random_graph_tuple_database_generator",
         "//deeplearning/ml4pl/testing:testing_databases",
@@ -178,6 +178,7 @@ py_test(
     name = "log_analysis_test",
     size = "enormous",
     srcs = ["log_analysis_test.py"],
+    shard_count = 8,
     deps = [
         ":log_analysis",
         ":log_database",
@@ -217,6 +218,7 @@ py_test(
     name = "log_database_test",
     size = "enormous",
     srcs = ["log_database_test.py"],
+    shard_count = 8,
     deps = [
         ":log_database",
         "//deeplearning/ml4pl/testing:random_log_database_generator",
@@ -277,6 +279,7 @@ py_test(
     name = "run_test",
     size = "enormous",
     srcs = ["run_test.py"],
+    shard_count = 8,
     deps = [
         ":batch",
         ":classifier_base",

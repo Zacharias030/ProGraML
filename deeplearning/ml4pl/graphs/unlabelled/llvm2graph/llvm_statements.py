@@ -20,8 +20,10 @@ import typing
 
 import networkx as nx
 
+from deeplearning.ml4pl.graphs import nx_utils
 from deeplearning.ml4pl.graphs import programl_pb2
 from deeplearning.ncc import rgx_utils as rgx
+from deeplearning.ncc.inst2vec import inst2vec_preprocess
 from labm8.py import app
 
 
@@ -83,7 +85,7 @@ def StripIdentifiersAndImmediates(stmt: str) -> str:
 
 
 def GetLlvmStatementDefAndUses(
-  statement: str, store_destination_is_def: bool = False
+  statement: str,
 ) -> typing.Tuple[str, typing.List[str]]:
   """Get the destination identifier for an LLVM statement (if any), and a list
   of operand identifiers (if any).
@@ -131,11 +133,10 @@ def GetCalledFunctionName(statement) -> typing.Optional[str]:
 def FindCallSites(graph, source_function, destination_function):
   """Find the statements in function that call another function."""
   call_sites = []
-  for node, data in StatementNodeIterator(graph):
+  for node, data in nx_utils.StatementNodeIterator(graph):
     if data["function"] != source_function:
       continue
-    statement = data.get("original_text", data["text"])
-    called_function = GetCalledFunctionName(statement)
+    called_function = GetCalledFunctionName(data["text"])
     if not called_function:
       continue
     if called_function == destination_function:

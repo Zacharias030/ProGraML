@@ -28,6 +28,8 @@ from labm8.py import app
 FLAGS = app.FLAGS
 
 # The root directory for storing temporary files.
+# We use /tmp/ as the default root because other plausible locations like
+# ~/.cache are sandboxed by bazel during testing.
 TMP_ROOT = pathlib.Path(
   os.environ.get(
     "ML4PL_TMP_ROOT", f"/tmp/ml4pl/{os.environ.get('USER', 'anon')}"

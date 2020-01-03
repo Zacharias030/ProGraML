@@ -49,6 +49,7 @@ py_binary(
         "//labm8/py:app",
         "//labm8/py:fs",
         "//labm8/py:system",
+        "//third_party/py/fasteners",
         "//third_party/py/sqlalchemy",
     ],
 )
@@ -56,6 +57,7 @@ py_binary(
 py_test(
     name = "run_id_test",
     srcs = ["run_id_test.py"],
+    shard_count = 3,
     deps = [
         ":run_id",
         "//labm8/py:sqlutil",
