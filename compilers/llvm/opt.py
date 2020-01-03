@@ -27,6 +27,7 @@ import functools
 import pathlib
 import subprocess
 import sys
+import os
 import typing
 
 from compilers.llvm import llvm
@@ -42,10 +43,13 @@ app.DEFINE_integer(
   "The maximum number of seconds to allow process to run.",
 )
 
+
 _LLVM_REPO = "llvm_linux" if system.is_linux() else "llvm_mac"
 
+file_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Path to opt binary.
-OPT = bazelutil.DataPath(f"{_LLVM_REPO}/bin/opt")
+OPT = bazelutil.DataPath(f"{file_dir}/../../{_LLVM_REPO}/bin/opt")
 
 # The list of LLVM opt transformation passes.
 # See: https://llvm.org/docs/Passes.html#transform-passes

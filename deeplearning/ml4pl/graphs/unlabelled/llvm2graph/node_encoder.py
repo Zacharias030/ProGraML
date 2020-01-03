@@ -15,6 +15,7 @@
 # limitations under the License.
 """A module for encoding node embeddings."""
 import pickle
+import os
 from typing import List
 
 import networkx as nx
@@ -29,11 +30,13 @@ from labm8.py import decorators
 
 FLAGS = app.FLAGS
 
+file_dir = os.path.dirname(os.path.abspath(__file__))
+
 DICTIONARY = bazelutil.DataPath(
-  "phd/deeplearning/ml4pl/graphs/unlabelled/llvm2graph/node_embeddings/inst2vec_augmented_dictionary.pickle"
+  f"{file_dir}/node_embeddings/inst2vec_augmented_dictionary.pickle"
 )
 AUGMENTED_INST2VEC_EMBEDDINGS = bazelutil.DataPath(
-  "phd/deeplearning/ml4pl/graphs/unlabelled/llvm2graph/node_embeddings/inst2vec_augmented_embeddings.pickle"
+  f"{file_dir}/node_embeddings/inst2vec_augmented_embeddings.pickle"
 )
 
 

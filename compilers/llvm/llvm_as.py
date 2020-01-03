@@ -25,6 +25,7 @@ Usage:
 """
 import subprocess
 import sys
+import os
 import typing
 
 from compilers.llvm import llvm
@@ -42,8 +43,11 @@ app.DEFINE_integer(
 
 _LLVM_REPO = "llvm_linux" if system.is_linux() else "llvm_mac"
 
+file_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Path to llvm-as binary.
-LLVM_AS = bazelutil.DataPath(f"{_LLVM_REPO}/bin/llvm-as")
+#LLVM_AS = bazelutil.DataPath(f"{_LLVM_REPO}/bin/llvm-as")
+LLVM_AS = bazelutil.DataPath(f"{file_dir}/../../{_LLVM_REPO}/bin/llvm-as")
 
 
 class LlvmAsError(llvm.LlvmError):

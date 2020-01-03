@@ -1,0 +1,20 @@
+# Files created by the installer
+.env
+bootstrap.sh
+config.pbtxt
+requirements.txt
+
+# Files created by bazel
+bazel-bin
+bazel-out
+bazel-ProGraML
+bazel-testlogs
+
+# Cache files
+**/__pycache__
+
+# Zach thesis stuff
+deeplearning/ml4pl/poj104/.ipynb_checkpoints/
+deeplearning/ml4pl/poj104/classifyapp_data
+deeplearning/ml4pl/poj104/classifyapp_data.zip
+
