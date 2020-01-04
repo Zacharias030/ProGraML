@@ -1,0 +1,71 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "ggnn.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/ggnn.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--log_db",
+                "sqlite:////${workspaceFolder}/data/logs/ggnn_trashme.db",
+                "--log_dir",
+                "${workspaceFolder}/data/logs/",
+                "--graph_db='file:///tmp/cc1.mysql?programl_devmap_amd?charset=utf8'",
+            ]
+        },
+        {
+            "name": "BZ ggnn.py",
+            "type": "python",
+            "request": "launch",
+            "env": {
+                "PYTHONPATH": "phd:pypi__setuptools_42_0_2:pypi__six_1_13_0:pypi__protobuf_3_6_1:pypi__grpcio_1_20_0:pypi__protobuf_3_7_1:phd/config_pb_py_pb:pypi__six_1_11_0:pypi__absl_py_0_7_0:pypi__torch_1_3_1:phd/deeplearning/ml4pl/graphs/programl_pb_py_pb:pypi__decorator_4_3_0:pypi__networkx_2_2:pypi__numpy_1_16_4:pypi__humanize_0_5_1:pypi__Send2Trash_1_5_0:pypi__SQLAlchemy_1_3_10:pypi__mysqlclient_1_4_2_post1:pypi__pytz_2018_3:pypi__tqdm_4_38_0:pypi__scikit_learn_0_20_3:pypi__scipy_1_2_1:pypi__requests_2_20_1:pypi__gspread_3_1_0:pypi__gspread_dataframe_3_0_3:pypi__oauth2client_4_1_3:pypi__httplib2_0_14_0:pypi__pyasn1_0_4_7:pypi__rsa_4_0:pypi__pyasn1_modules_0_2_7:pypi__pandas_0_24_1:pypi__python_dateutil_2_6_1:pypi__tabulate_0_8_5:pypi__pyfiglet_0_8_post1"
+            },
+            "cwd": "/Users/Zacharias/Uni/ETH/FS2019/THESIS/code/ProGraML/bazel-bin/deeplearning/ml4pl/models/ggnn/ggnn.runfiles",
+            "program": "/Users/Zacharias/Uni/ETH/FS2019/THESIS/code/ProGraML/bazel-bin/deeplearning/ml4pl/models/ggnn/ggnn.runfiles/phd/deeplearning/ml4pl/models/ggnn/ggnn.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--log_db",
+                "sqlite:////${workspaceFolder}/data/logs/ggnn_trashme.db",
+                "--num_epochs=5",
+                "--graph_db",
+                "sqlite:////${workspaceFolder}/data/db/devmap_amd.db",
+                "--test_group",
+                "0",
+                "--val_group",
+                "1",
+                "--position_embeddings",
+                "off",
+                "--inst2vec_embeddings",
+                "constant",
+                "--output_layer_dropout",
+                "0.5"
+            ]
+        },
+        {
+            "name": "TEST ggnn.py",
+            "type": "python",
+            "request": "launch",
+            "env": {
+                "PYTHONPATH": "phd:pypi__setuptools_42_0_2:pypi__six_1_13_0:pypi__protobuf_3_6_1:pypi__grpcio_1_20_0:pypi__protobuf_3_7_1:phd/config_pb_py_pb:pypi__six_1_11_0:pypi__absl_py_0_7_0:pypi__torch_1_3_1:phd/deeplearning/ml4pl/graphs/programl_pb_py_pb:pypi__decorator_4_3_0:pypi__networkx_2_2:pypi__numpy_1_16_4:pypi__humanize_0_5_1:pypi__Send2Trash_1_5_0:pypi__SQLAlchemy_1_3_10:pypi__mysqlclient_1_4_2_post1:pypi__pytz_2018_3:pypi__tqdm_4_38_0:pypi__scikit_learn_0_20_3:pypi__scipy_1_2_1:pypi__requests_2_20_1:pypi__gspread_3_1_0:pypi__gspread_dataframe_3_0_3:pypi__oauth2client_4_1_3:pypi__httplib2_0_14_0:pypi__pyasn1_0_4_7:pypi__rsa_4_0:pypi__pyasn1_modules_0_2_7:pypi__pandas_0_24_1:pypi__python_dateutil_2_6_1:pypi__tabulate_0_8_5:pypi__pyfiglet_0_8_post1:pypi__pytest_5_3_1:pypi__pluggy_0_13_1:pypi__importlib_metadata_0_23:pypi__zipp_0_6_0:pypi__more_itertools_7_2_0:pypi__py_1_5_2:pypi__packaging_19_2:pypi__pytest_benchmark_3_2_2:pypi__pytest_cov_2_8_1:pypi__pytest_mock_1_12_1:pypi__flaky_3_6_1:pypi__coverage_4_5_1"
+            },
+            "cwd": "/Users/Zacharias/Uni/ETH/FS2019/THESIS/code/ProGraML/bazel-bin/deeplearning/ml4pl/models/ggnn/ggnn_test.runfiles",
+            "program": "/Users/Zacharias/Uni/ETH/FS2019/THESIS/code/ProGraML/bazel-bin/deeplearning/ml4pl/models/ggnn/ggnn_test.runfiles/phd/deeplearning/ml4pl/models/ggnn/ggnn_test.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--test_capture_output=false"
+            ]
+        },
+    ]
+}
