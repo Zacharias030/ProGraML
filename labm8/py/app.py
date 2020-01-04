@@ -182,10 +182,10 @@ def GetVerbosity() -> int:
 def _MaybeColorizeLog(color: str, msg: str, *args) -> str:
   """Conditionally apply shell colorization to the given format string."""
   string = str(msg) % args
-  if FLAGS.log_colors:
-    return f"{shell.ShellEscapeCodes.BOLD}{color}{string}{shell.ShellEscapeCodes.END}"
-  else:
-    return string
+  #if FLAGS.log_colors:
+  return f"{shell.ShellEscapeCodes.BOLD}{color}{string}{shell.ShellEscapeCodes.END}"
+  #else:
+  #  return string
 
 
 # Skip this function when determining the calling module and line number for
@@ -200,18 +200,19 @@ def Log(level: int, msg, *args, **kwargs):
     "filename base (that is, name ignoring .py). <log level> overrides any "
     "value given by --v."
   """
-  logging.Log(
-    logging.GetCallingModuleName(),
-    level,
-    _MaybeColorizeLog(
+  #logging.Log(
+  #  logging.GetCallingModuleName(),
+  #  level,
+  print_str = _MaybeColorizeLog(
       shell.ShellEscapeCodes.YELLOW
       if level > 1
       else shell.ShellEscapeCodes.CYAN,
       msg,
       *args,
-    ),
-    **kwargs,
-  )
+    )#,
+  #  **kwargs,
+  #)
+  print(print_str)
 
 
 @skip_log_prefix
