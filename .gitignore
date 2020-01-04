@@ -18,3 +18,5 @@ deeplearning/ml4pl/poj104/.ipynb_checkpoints/
 deeplearning/ml4pl/poj104/classifyapp_data
 deeplearning/ml4pl/poj104/classifyapp_data.zip
 
+llvm_mac
+third_party/py/tensorflow/BUILD
