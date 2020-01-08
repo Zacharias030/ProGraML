@@ -50,6 +50,7 @@ class GGNNModel(nn.Module):
 
     self.graphlevel_readout = None
     if config.has_graph_labels:
+      #assert config.has_graph_labels, "Cannot set config.has_aux_input without has_graph_labels"
       self.graphlevel_readout = AuxiliaryReadout(config)
 
     # eval and training
@@ -79,6 +80,11 @@ class GGNNModel(nn.Module):
     aux_in=None,
     test_time_steps=None,
   ):
+    """
+    Tensor shapes:
+        vocab_ids: <N>
+    """
+    assert len(vocab_ids.size()) == 1, f"vocab_ids.size() = {vocab_ids.size()}, but expected [N]"
     raw_in = self.node_embeddings(vocab_ids, selector_ids)
     raw_out, raw_in, *unroll_stats = self.ggnn(
       edge_lists, raw_in, pos_lists, test_time_steps
@@ -390,7 +396,7 @@ class MessagingLayer(nn.Module):
       )
 
   def forward(self, edge_lists, node_states, pos_lists):
-    """edge_lists: [<M_i, 2>, ...]"""
+    """edge_lists: [<M_i, 2>, ...], where M_i is the number of edges of type i."""
 
     if self.pos_transform:
       pos_gating = 2 * torch.sigmoid(self.pos_transform(self.position_embs))
