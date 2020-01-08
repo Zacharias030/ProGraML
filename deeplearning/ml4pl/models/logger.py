@@ -22,7 +22,7 @@ from typing import Optional
 import pandas as pd
 import sqlalchemy as sql
 
-import build_info
+#import build_info
 from deeplearning.ml4pl import run_id as run_id_lib
 from deeplearning.ml4pl.graphs.labelled import graph_tuple_database
 from deeplearning.ml4pl.models import batch
@@ -175,13 +175,13 @@ class Logger(object):
         log_database.ParameterType.INPUT_GRAPHS_INFO,
         graph_db.stats_json,
       )
-      +
+      #+
       # Record build info.
-      log_database.Parameter.CreateManyFromDict(
-        run_id,
-        log_database.ParameterType.BUILD_INFO,
-        pbutil.ToJson(build_info.GetBuildInfo()),
-      )
+      #log_database.Parameter.CreateManyFromDict(
+      #  run_id,
+      #  log_database.ParameterType.BUILD_INFO,
+      #  pbutil.ToJson(build_info.GetBuildInfo()),
+      #)
     )
 
   def OnBatchEnd(
