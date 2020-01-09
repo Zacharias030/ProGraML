@@ -19,8 +19,8 @@ from typing import List
 class GGNNConfig(object):
   def __init__(self):
     self.num_epochs = 300
-    self.num_classes: int = 3 # 104
-    self.batch_size = 4
+    self.num_classes: int = 104
+    self.batch_size = 16
     self.lr: float = 0.001
     self.patience = 100
     self.clip_grad_norm: float = 6.0

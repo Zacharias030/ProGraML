@@ -1,10 +1,20 @@
-import pickle, time, os, json
+import pickle, time, os, json, sys
 from pathlib import Path
 
 import tqdm
 import numpy as np
 import torch
 from torch_geometric.data import Data, DataLoader, InMemoryDataset
+
+
+# make this file executable from anywhere
+if __name__ == '__main__':
+    full_path = os.path.realpath(__file__)
+    print(full_path)
+    root = full_path.rsplit('ProGraML', maxsplit=1,)[0] + 'ProGraML'
+    print(root)
+    #insert at 1, 0 is the script path (or '' in REPL)
+    sys.path.insert(1, root)
 
 
 from deeplearning.ml4pl.models.ggnn.ggnn_modules import GGNNModel
@@ -15,10 +25,16 @@ class Learner(object):
     def __init__(self):
 
         self.args = {
-            '--log_dir': 'deeplearning/ml4pl/poj104/classifyapp_data/logs/',
-            '--data_dir': 'deeplearning/ml4pl/poj104/classifyapp_data/ir_val',
+            '--log_dir': 'deeplearning/ml4pl/poj104/classifyapp_logs/',
+            '--data_dir': 'deeplearning/ml4pl/poj104/classifyapp_data',
             #'--test_only',
             }
+        # override args from file
+        #args_file = Path('deeplearning/ml4pl/poj104/dataset_.json')
+        #if args_file.exists():
+        #    with open(args_file, 'r') as f:
+        #        update_args = json.load(f)
+        #    self.args.update(update_args)
 
         # prepare logging
         self.run_id = "_".join([time.strftime("%Y-%m-%d-%H-%M-%S"), str(os.getpid())])
@@ -36,18 +52,20 @@ class Learner(object):
 
         # load data
         self.data_dir = self.args.get('--data_dir', '.')
-        self.train_data = self.get_dataloader(self.data_dir, self.config)
-        self.valid_data = self.get_dataloader(self.data_dir, self.config)
+        self.train_data = self.get_dataloader(self.data_dir + '/ir_train', self.config)
+        self.valid_data = self.get_dataloader(self.data_dir + '/ir_val', self.config)
+        #self.test_data = self.get_dataloader(self.data_dir + '/ir_test', self.config)
 
         # create model
         self.model = GGNNModel(self.config)
         self.global_training_step = 0
         self.current_epoch = 1
 
-        
-
         # set some global config values
-        dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        self.dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        
+        # move model to gpu
+        self.model.to(self.dev)
 
         # log config to file
         config_dict = {a: getattr(self.config, a) for a in dir(self.config) if not a.startswith('__')}
@@ -61,10 +79,10 @@ class Learner(object):
     def get_dataloader(self, ds_base, config):
         ds_base = Path(ds_base) if type(ds_base) is str else ds_base
         datalist = []
-        out_base = ds_base.parent / (ds_base.name + "_pygeom")
+        out_base = ds_base.parent / (ds_base.name + "_programl")
         print(f"=== DATASET {ds_base}: getting dataloader")
 
-        folders = [x for x in out_base.glob("*") if x.is_dir()]
+        folders = [x for x in out_base.glob("*") if x.is_dir() and x.name not in ['_nx', '_tuples']]
         for folder in tqdm.tqdm(folders):
             # skip classes that are larger than what config says to enable debugging with less data
             if int(folder.name) > config.num_classes:
@@ -96,17 +114,26 @@ class Learner(object):
 
         for step, batch in enumerate(bar):
             self.global_training_step += 1
-
-            ######### prepare input
-            edge_lists = []
-            for i in range(3):
-                mask = batch.edge_attr.squeeze() == i
-                edge_list = batch.edge_index[:, mask].t()
-                edge_lists.append(edge_list)
-
             num_graphs = batch.batch[-1].item() + 1
             processed_graphs += num_graphs
-            edge_positions = [torch.zeros_like(edge_lists[i])[:, 1] for i in range(3)]
+
+            ######### prepare input
+            # move batch to gpu and prepare input tensors:
+            batch.to(self.dev)
+
+            edge_lists = []
+            edge_positions = []
+            for i in range(3):
+                # mask by edge type
+                mask = batch.edge_attr[:, 0].squeeze() == i # <M_i>
+                edge_list = batch.edge_index[:, mask].t()
+                edge_lists.append(edge_list)
+            
+                #[torch.zeros_like(edge_lists[i])[:, 1] for i in range(3)]
+                edge_pos = batch.edge_attr[mask, 1]
+                edge_positions.append(edge_pos)
+
+
             #############
             # enter correct mode of model
             if epoch_type == "train":
@@ -114,7 +141,7 @@ class Learner(object):
                     self.model.train()
                 outputs = self.model(
                     vocab_ids=batch.x.squeeze(),
-                    selector_ids=torch.zeros_like(batch.x),
+                    selector_ids=torch.zeros_like(batch.x).to(self.dev), # move to dev #TODO make selectors optional
                     labels=batch.y - 1, # labels start at 0!!!
                     edge_lists=edge_lists,
                     pos_lists=edge_positions,
@@ -128,7 +155,7 @@ class Learner(object):
                 with torch.no_grad():  # don't trace computation graph!
                     outputs = self.model(
                         vocab_ids=batch.x.squeeze(),
-                        selector_ids=torch.zeros_like(batch.x),
+                        selector_ids=torch.zeros_like(batch.x).to(self.dev), # move to dev #TODO
                         labels=batch.y - 1,
                         edge_lists=edge_lists,
                         pos_lists=edge_positions,
