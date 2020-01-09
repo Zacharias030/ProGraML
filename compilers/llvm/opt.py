@@ -538,7 +538,7 @@ def Exec(
   """
   opt = opt or OPT
   cmd = ["timeout", "-s9", str(timeout_seconds), str(opt)] + args
-  print(f"$ {' '.join(cmd)}")
+  #print(f"$ {' '.join(cmd)}")
   #app.Log(3, "$ %s", " ".join(cmd))
   process = subprocess.Popen(
     cmd,
