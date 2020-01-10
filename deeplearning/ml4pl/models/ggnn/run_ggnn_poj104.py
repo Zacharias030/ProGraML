@@ -52,11 +52,9 @@ class Learner(object):
 
         # load data
         self.data_dir = self.args.get('--data_dir', '.')
-        self.train_data = POJ104Dataset(root=self.data_dir, split='train')  # self.get_dataloader(self.data_dir + '/ir_train', self.config)
-        self.train_data = self.get_dataloader(self.train_data, self.config, shuffle=True)
-        self.valid_data = POJ104Dataset(root=self.data_dir, split='val') #self.get_dataloader(self.data_dir + '/ir_val', self.config)
-        self.valid_data = self.get_dataloader(self.valid_data, self.config, shuffle=False)
-        #self.test_data = self.get_dataloader(self.data_dir + '/ir_test', self.config)
+        self.train_data = DataLoader(POJ104Dataset(root=self.data_dir, split='train'), batch_size=self.config.batch_size, shuffle=True)
+        self.valid_data = DataLoader(POJ104Dataset(root=self.data_dir, split='val'), batch_size=self.config.batch_size, shuffle=False)
+        self.test_data = DataLoader(POJ104Dataset(root=self.data_dir, split='test'), batch_size=self.config.batch_size, shuffle=False)
 
         # create model
         self.model = GGNNModel(self.config)
@@ -224,12 +222,21 @@ class Learner(object):
                 % (valid_loss, f"{valid_acc:.5f}", valid_speed)
             )
 
+            test_loss, test_acc, test_speed = self.run_epoch(
+                self.test_data, "eval"
+            )
+            print(
+                "\r\x1b[K Test: loss: %.5f | acc: %s | instances/sec: %.2f"
+                % (test_loss, f"{test_acc:.5f}", test_speed)
+            )
+
             epoch_time = time.time() - total_time_start
             log_entry = {
                 "epoch": epoch,
                 "time": epoch_time,
                 "train_results": (train_loss, train_acc.tolist(), train_speed),
                 "valid_results": (valid_loss, valid_acc.tolist(), valid_speed),
+                "test_results": (test_loss, test_acc.tolist(), test_speed),
             }
             log_to_save.append(log_entry)
             with open(self.log_file, "w") as f:
