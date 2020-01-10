@@ -11,15 +11,15 @@ from torch_geometric.data import Data, DataLoader, InMemoryDataset
 if __name__ == '__main__':
     full_path = os.path.realpath(__file__)
     print(full_path)
-    root = full_path.rsplit('ProGraML', maxsplit=1,)[0] + 'ProGraML'
-    print(root)
+    repo_root = full_path.rsplit('ProGraML', maxsplit=1,)[0] + 'ProGraML'
+    print(repo_root)
     #insert at 1, 0 is the script path (or '' in REPL)
-    sys.path.insert(1, root)
+    sys.path.insert(1, repo_root)
 
 
 from deeplearning.ml4pl.models.ggnn.ggnn_modules import GGNNModel
 from deeplearning.ml4pl.models.ggnn.ggnn_config_poj104 import GGNNConfig
-
+from deeplearning.ml4pl.poj104.dataset import POJ104Dataset
 
 class Learner(object):
     def __init__(self):
@@ -52,8 +52,10 @@ class Learner(object):
 
         # load data
         self.data_dir = self.args.get('--data_dir', '.')
-        self.train_data = self.get_dataloader(self.data_dir + '/ir_train', self.config)
-        self.valid_data = self.get_dataloader(self.data_dir + '/ir_val', self.config)
+        self.train_data = POJ104Dataset(root=self.data_dir, split='train')  # self.get_dataloader(self.data_dir + '/ir_train', self.config)
+        self.train_data = self.get_dataloader(self.train_data, self.config, shuffle=True)
+        self.valid_data = POJ104Dataset(root=self.data_dir, split='val') #self.get_dataloader(self.data_dir + '/ir_val', self.config)
+        self.valid_data = self.get_dataloader(self.valid_data, self.config, shuffle=False)
         #self.test_data = self.get_dataloader(self.data_dir + '/ir_test', self.config)
 
         # create model
@@ -76,25 +78,8 @@ class Learner(object):
             % (self.run_id, json.dumps(config_dict))
         )
 
-    def get_dataloader(self, ds_base, config):
-        ds_base = Path(ds_base) if type(ds_base) is str else ds_base
-        datalist = []
-        out_base = ds_base.parent / (ds_base.name + "_programl")
-        print(f"=== DATASET {ds_base}: getting dataloader")
-
-        folders = [x for x in out_base.glob("*") if x.is_dir() and x.name not in ['_nx', '_tuples']]
-        for folder in tqdm.tqdm(folders):
-            # skip classes that are larger than what config says to enable debugging with less data
-            if int(folder.name) > config.num_classes:
-                continue
-            # print(f"=== Opening Folder {str(folder)} ===")
-            for k, file in enumerate(folder.glob("*.data.p")):
-                # print(f"{k} - Processing {str(file)} ...")
-                with open(file, "rb") as f:
-                    data = pickle.load(f)
-                datalist.append(data)
-        print(f" * COMPLETED * === DATASET {ds_base}: returning dataloader")
-        return DataLoader(datalist, batch_size=config.batch_size, shuffle=True)
+    def get_dataloader(self, dataset, config, shuffle=True):
+        return DataLoader(dataset, batch_size=config.batch_size, shuffle=shuffle)
 
     def run_epoch(self, loader, epoch_type):
         """
