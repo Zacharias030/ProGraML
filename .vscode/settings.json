@@ -1,3 +1,19 @@
 {
-    "python.pythonPath": "/home/zacharias/anaconda3/bin/python"
+    "python.pythonPath": "/home/zacharias/anaconda3/bin/python",
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/*/**": true,
+        "bazel-bin/**": true,
+        "bazel-genfiles/**": true,
+        "bazel-out/**": true,
+        "bazel-ProGraML/**": true,
+        "bazel-testlogs/**": true,
+        "tools/**": true,
+        "third_party/**": true,
+        "labm8/**": true,
+        "deeplearning/clgen/**": true,
+        "datasets/**": true
+    },
+    "debug.node.autoAttach": "on"
 }
