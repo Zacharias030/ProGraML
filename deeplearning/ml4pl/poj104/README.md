@@ -1,3 +1,17 @@
+
+# Install pytorch and pytorch-geometric
+```
+pip install torch
+# set paths: 
+
+pip install --verbose --no-cache-dir torch-scatter
+pip install --verbose --no-cache-dir torch-sparse
+pip install --verbose --no-cache-dir torch-cluster
+pip install --verbose --no-cache-dir torch-spline-conv (optional)
+pip install torch-geometric
+```
+
+
 # How to run the dataset generation?
 
 * Install pytorch-geometric (see their website)

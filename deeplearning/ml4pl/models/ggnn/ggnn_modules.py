@@ -451,13 +451,13 @@ class GGNNLayer(nn.Module):
     )
 
   def forward(self, messages, node_states):
-    if self.dropout > 0.0:
-      F.dropout_(messages, p=self.dropout, training=self.training, inplace=True)
+    #if self.dropout > 0.0:
+    #  F.dropout_(messages, p=self.dropout, training=self.training, inplace=True)
 
     output = self.gru(messages, node_states)
 
     if self.dropout > 0.0:
-      F.dropout_(output, p=self.dropout, training=self.training, inplace=True)
+      F.dropout(output, p=self.dropout, training=self.training, inplace=True)
     return output
 
 

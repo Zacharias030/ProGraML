@@ -25,7 +25,7 @@ class POJ104Dataset(InMemoryDataset):
     
     @property
     def processed_file_names(self):
-        return ['train_data.pt', 'val_data.pt'] #, 'test_data.pt']
+        return ['train_data.pt', 'val_data.pt', 'test_data.pt']
     
     def download(self):
         # download to self.raw_dir

@@ -45,7 +45,8 @@ class GGNNConfig(object):
 
     self.output_dropout: float = 0.0  # dropout prob = 1-keep_prob
     self.edge_weight_dropout: float = 0.0
-    self.graph_state_dropout: float = 0.0
+    self.graph_state_dropout: float = 0.1
+    self.random_seed: int = 42
     ###############
 
     self.has_graph_labels: bool = True

@@ -15,6 +15,7 @@ if __name__ == '__main__':
     print(repo_root)
     #insert at 1, 0 is the script path (or '' in REPL)
     sys.path.insert(1, repo_root)
+    repo_root = Path(repo_root)
 
 
 from deeplearning.ml4pl.models.ggnn.ggnn_modules import GGNNModel
@@ -38,7 +39,7 @@ class Learner(object):
 
         # prepare logging
         self.run_id = "_".join([time.strftime("%Y-%m-%d-%H-%M-%S"), str(os.getpid())])
-        log_dir = self.args.get("--log_dir", '.')
+        log_dir = repo_root / self.args.get("--log_dir", '.')
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         self.log_file = os.path.join(log_dir, "%s_log.json" % self.run_id)
@@ -51,10 +52,14 @@ class Learner(object):
         self.config = GGNNConfig()
 
         # load data
-        self.data_dir = self.args.get('--data_dir', '.')
-        self.train_data = DataLoader(POJ104Dataset(root=self.data_dir, split='train'), batch_size=self.config.batch_size, shuffle=True)
+        self.data_dir = repo_root / self.args.get('--data_dir', '.')
         self.valid_data = DataLoader(POJ104Dataset(root=self.data_dir, split='val'), batch_size=self.config.batch_size, shuffle=False)
         self.test_data = DataLoader(POJ104Dataset(root=self.data_dir, split='test'), batch_size=self.config.batch_size, shuffle=False)
+        self.train_data = DataLoader(POJ104Dataset(root=self.data_dir, split='train'), batch_size=self.config.batch_size, shuffle=True)
+
+        # set seeds, NB: the NN on CUDA is partially non-deteministic!
+        torch.manual_seed(self.config.random_seed)
+        np.random.seed(self.config.random_seed)
 
         # create model
         self.model = GGNNModel(self.config)
