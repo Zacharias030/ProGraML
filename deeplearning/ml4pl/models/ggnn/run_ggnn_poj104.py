@@ -1,6 +1,19 @@
+"""
+Usage:
+   run_ggnn_poj104.py
+
+Options:
+    -h --help                       Show this screen.
+    --data_dir DATA_DIR             Directory to of dataset. [default: deeplearning/ml4pl/poj104/classifyapp_data]
+    --log_dir LOG_DIR               Directory to store logfiles and trained models relative to repository dir. [default: deeplearning/ml4pl/poj104/classifyapp_logs/]
+    --config CONFIG                 Path to a config json.
+    --restore CHECKPOINT            Path to a model file to restore from.
+"""
+
 import pickle, time, os, json, sys
 from pathlib import Path
 
+from docopt import docopt
 import tqdm
 import numpy as np
 import torch
@@ -68,7 +81,7 @@ class Learner(object):
 
         # set some global config values
         self.dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        
+
         # move model to gpu
         self.model.to(self.dev)
 
@@ -93,14 +106,14 @@ class Learner(object):
             loss, accuracy, instance_per_second
         """
 
-        bar = tqdm.tqdm(loader)
+        bar = tqdm.tqdm(total=len(loader) * self.config.batch_size, smoothing=0.01, unit='inst')
 
         epoch_loss = 0
         accuracies = []
         start_time = time.time()
         processed_graphs = 0
 
-        for step, batch in enumerate(bar):
+        for step, batch in enumerate(loader):
             self.global_training_step += 1
             num_graphs = batch.batch[-1].item() + 1
             processed_graphs += num_graphs
@@ -116,7 +129,7 @@ class Learner(object):
                 mask = batch.edge_attr[:, 0].squeeze() == i # <M_i>
                 edge_list = batch.edge_index[:, mask].t()
                 edge_lists.append(edge_list)
-            
+
                 #[torch.zeros_like(edge_lists[i])[:, 1] for i in range(3)]
                 edge_pos = batch.edge_attr[mask, 1]
                 edge_positions.append(edge_pos)
@@ -182,9 +195,11 @@ class Learner(object):
                     )
                 self.model.opt.step()
                 self.model.opt.zero_grad()
-            
-            bar.set_postfix(loss=epoch_loss / processed_graphs, acc=np.sum(accuracies, axis=0) / processed_graphs)
 
+            bar.set_postfix(loss=epoch_loss / processed_graphs, acc=np.sum(accuracies, axis=0) / processed_graphs)
+            bar.update(num_graphs)
+
+        bar.close()
         mean_loss = epoch_loss / processed_graphs
         accuracy = np.sum(accuracies, axis=0) / processed_graphs
         instance_per_sec = processed_graphs / (time.time() - start_time)
