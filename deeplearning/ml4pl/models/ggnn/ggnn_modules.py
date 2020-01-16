@@ -45,7 +45,7 @@ class GGNNModel(nn.Module):
     self.ggnn = GGNNProper(config)
     self.readout = Readout(config)
     # make readout available to label_convergence tests in GGNN Proper (at runtime)
-    if self.config.unroll_strategy == "label_convergence":
+    if hasattr(self.config, 'unroll_strategy') and self.config.unroll_strategy == "label_convergence":
       self.ggnn.readout = self.readout
 
     # eval and training
@@ -54,11 +54,19 @@ class GGNNModel(nn.Module):
 
     # not instantiating the optimizer should save 2 x #model_params of GPU memory, bc. Adam
     # carries two momentum params per trainable model parameter.
+
+    # move model to device before making optimizer!
+    self.dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+    self.to(self.dev)
+    print(f"Moved model to {self.dev}")
+
     if test_only:
       self.opt = None
       self.eval()
     else:
       self.opt = self.get_optimizer(config)
+    
 
   def get_optimizer(self, config):
     return optim.AdamW(self.parameters(), lr=config.lr)  # NB: AdamW
@@ -66,10 +74,10 @@ class GGNNModel(nn.Module):
   def forward(
     self,
     vocab_ids,
-    selector_ids,
     labels,
     edge_lists,
-    pos_lists,
+    selector_ids=None,
+    pos_lists=None,
     num_graphs=None,
     graph_nodes_list=None,
     aux_in=None,
@@ -97,6 +105,10 @@ class GGNNModel(nn.Module):
     )
 
     return outputs
+
+    def num_parameters(self) -> int:
+        """Compute the number of trainable parameters in this nn.Module and its children."""
+        return sum(param.numel() for param in self.parameters(recurse=True) if param.requires_grad)
 
 
 #############################
@@ -231,7 +243,7 @@ class NodeEmbeddings(nn.Module):
     else:
       self.selector_embs = None
 
-  def forward(self, vocab_ids, selector_ids):
+  def forward(self, vocab_ids, selector_ids=None):
     embs = self.node_embs(vocab_ids)
     if self.selector_embs:
       selector_embs = self.selector_embs(selector_ids)
@@ -250,12 +262,12 @@ class GGNNProper(nn.Module):
     self.backward_edges = config.backward_edges
     self.layer_timesteps = config.layer_timesteps
 
-    # eval time unrolling parameter
-    self.test_layer_timesteps = config.test_layer_timesteps
-    self.unroll_strategy = config.unroll_strategy
-    self.max_timesteps = config.max_timesteps
-    self.label_conv_threshold = config.label_conv_threshold
-    self.label_conv_stable_steps = config.label_conv_stable_steps
+    # optional eval time unrolling parameter
+    self.test_layer_timesteps = config.test_layer_timesteps if hasattr(config, 'test_layer_timesteps') else 0
+    self.unroll_strategy = config.unroll_strategy if hasattr(config, 'unroll_strategy') else 'none'
+    self.max_timesteps = config.max_timesteps if hasattr(config, 'max_timesteps') else 1000
+    self.label_conv_threshold = config.label_conv_threshold if hasattr(config, 'label_conv_threshold') else 0.995
+    self.label_conv_stable_steps = config.label_conv_stable_steps if hasattr(config, 'label_conv_stable_steps') else 1
 
     self.message = nn.ModuleList()
     for i in range(len(self.layer_timesteps)):
@@ -265,7 +277,7 @@ class GGNNProper(nn.Module):
     for i in range(len(self.layer_timesteps)):
       self.update.append(GGNNLayer(config))
 
-  def forward(self, edge_lists, node_states, pos_lists, test_time_steps=None):
+  def forward(self, edge_lists, node_states, pos_lists=None, test_time_steps=None):
     old_node_states = node_states.clone()
 
     # we allow for some fancy unrolling strategies.
@@ -285,7 +297,7 @@ class GGNNProper(nn.Module):
       ), f"You need to pass test_time_steps or not use unroll_strategy '{self.unroll_strategy}''"
       layer_timesteps = [min(test_time_steps, self.max_timesteps)]
     elif self.unroll_strategy == "label_convergence":
-      node_states, unroll_steps, converged = self.label_conv_forward(
+      node_states, unroll_steps, converged = self.label_convergence_forward(
         edge_lists, node_states, pos_lists, initial_node_states=old_node_states
       )
       return node_states, old_node_states, unroll_steps, converged
@@ -300,7 +312,7 @@ class GGNNProper(nn.Module):
         node_states = self.update[layer_idx](messages, node_states)
     return node_states, old_node_states
 
-  def label_conv_forward(
+  def label_convergence_forward(
     self, edge_lists, node_states, pos_lists, initial_node_states
   ):
     assert (
@@ -393,7 +405,7 @@ class MessagingLayer(nn.Module):
         dropout=config.edge_weight_dropout,
       )
 
-  def forward(self, edge_lists, node_states, pos_lists):
+  def forward(self, edge_lists, node_states, pos_lists=None):
     """edge_lists: [<M_i, 2>, ...]"""
 
     if self.pos_transform:
@@ -414,7 +426,7 @@ class MessagingLayer(nn.Module):
         node_states.size()[0], dtype=torch.long, device=device
       )
 
-    for i, (edge_list, pos_list) in enumerate(zip(edge_lists, pos_lists)):
+    for i, edge_list in enumerate(edge_lists):
       edge_targets = edge_list[:, 1]
       edge_sources = edge_list[:, 0]
 
@@ -423,6 +435,7 @@ class MessagingLayer(nn.Module):
       )
 
       if self.pos_transform:
+        pos_list = pos_lists[i]
         pos_by_source = F.embedding(pos_list, pos_gating)
         messages_by_source.mul_(pos_by_source)
 

@@ -15,5 +15,6 @@
         "deeplearning/clgen/**": true,
         "datasets/**": true
     },
-    "debug.node.autoAttach": "on"
+    "debug.node.autoAttach": "off",
+    "python.jediEnabled": false
 }

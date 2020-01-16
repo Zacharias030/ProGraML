@@ -5,6 +5,43 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: run config_json",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py",
+            "console": "integratedTerminal",
+            "args": ["--config_json", "{'backward_edges': true, 'batch_size': 32, 'clip_grad_norm': 6.0, 'edge_type_count': 3, 'edge_weight_dropout': 0.0, 'emb_size': 200, 'graph_state_dropout': 0.1, 'has_aux_input': false, 'has_graph_labels': true, 'hidden_size': 200, 'inst2vec_embeddings': 'random', 'intermediate_loss_weight': 0.2, 'label_conv_stable_steps': 1, 'label_conv_threshold': 0.995, 'layer_timesteps': [2, 2, 2], 'log1p_graph_x': false, 'lr': 0.0001, 'max_timesteps': 1000, 'msg_mean_aggregation': true, 'num_classes': 104, 'num_epochs': 300, 'output_dropout': 0.0, 'patience': 100, 'position_embeddings': false, 'random_seed': 42, 'selector_size': 0, 'test_layer_timesteps': '0', 'train_subset': [0, 10], 'unroll_strategy': 'none', 'use_edge_bias': true, 'use_selector_embeddings': false, 'vocab_size': 8568}"
+                    ]
+        },
+        {
+            "name": "Python: run config",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py",
+            "console": "integratedTerminal",
+            "args": ["--config", "deeplearning/ml4pl/poj104/classifyapp_logs/2020-01-16-11-43-15_10290_params.json"
+                    ]
+        },
+        {
+            "name": "Python: run w/o args",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py",
+            "console": "integratedTerminal",
+            "args": [
+                    ]
+        },
+        {
+            "name": "Python: run w args",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py",
+            "console": "integratedTerminal",
+            "args": ["--restore", "deeplearning/ml4pl/poj104/classifyapp_logs/2020-01-14-01-15-04_24281_model_best.pickle",
+                     "--test",
+                    ]
+        },
+        {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
