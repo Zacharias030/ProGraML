@@ -18,45 +18,67 @@ from typing import List
 
 class GGNNConfig(object):
   def __init__(self):
-    self.num_epochs = 300
-    self.num_classes: int = 104
+    # Training Hyperparameters
+    self.num_epochs = 100
     self.batch_size = 32
-    self.lr: float = 0.0001
+    self.lr: float = 0.0005
     self.patience = 100
-    self.clip_grad_norm: float = 6.0
+    self.clip_grad_norm: float = 0.0
+    self.train_subset = [0, 10]
+    self.random_seed: int = 42
 
-    self.vocab_size: int = 8568
-    self.inst2vec_embeddings = 'random' #  One of {zero, constant, random, random_const, finetune}
-    self.emb_size: int = 200
-    self.use_selector_embeddings: bool = False
-    self.selector_size: int = 2 if self.use_selector_embeddings else 0
-    # TODO(github.com/ChrisCummins/ProGraML/issues/27):: Maybe refactor non-rectangular edge passing matrices for independent hidden size.
-    # hidden size of the whole model
-    self.hidden_size: int = self.emb_size + self.selector_size
-    self.position_embeddings: bool = False #FLAGS.position_embeddings #TODO(Zach)
     ###############
-
-    self.edge_type_count: int = 3
+    # Model Hyperparameters
     self.layer_timesteps: List[int] = [2, 2, 2]
+    self.emb_size: int = 200
+
     self.use_edge_bias: bool = True
     self.msg_mean_aggregation: bool = True
     self.backward_edges: bool = True
-    ###############
 
+    ###############
+    # Regularization
     self.output_dropout: float = 0.0  # dropout prob = 1-keep_prob
     self.edge_weight_dropout: float = 0.0
     self.graph_state_dropout: float = 0.1
-    self.random_seed: int = 42
-    ###############
 
+    # TODO(github.com/ChrisCummins/ProGraML/issues/27):: Maybe refactor non-rectangular edge passing matrices for independent hidden size.
+    # hidden size of the whole model
+    self.position_embeddings: bool = False
+
+
+    ###############
+    # Model and dataset inherent, don't change!
+    self.num_classes: int = 104
+    self.edge_type_count: int = 3
     self.has_graph_labels: bool = True
     self.has_aux_input: bool = False
-    self.log1p_graph_x = False
+    self.vocab_size: int = 8568
+    self.inst2vec_embeddings = 'random' #  One of {zero, constant, random, random_const, finetune}
+    self.use_selector_embeddings: bool = False
+    self.selector_size: int = 2 if self.use_selector_embeddings else 0
+    self.hidden_size: int = self.emb_size + self.selector_size
 
-    self.intermediate_loss_weight: float = 0.2
-    #########
-    self.unroll_strategy = 'none'
-    self.test_layer_timesteps = '0'
-    self.max_timesteps = 1000
-    self.label_conv_threshold: float = 0.995
-    self.label_conv_stable_steps: int = 1
+
+  @classmethod
+  def from_dict(cls, params):
+    """instantiate Config from params dict that overrides default values where given."""
+    config = cls()
+    if params is None:
+      return config
+
+    for key in params:
+      if hasattr(config, key):
+        getattr(config, key) == params[key]
+    return config
+
+  def to_dict(self):
+    config_dict = {a: getattr(self, a) for a in dir(self) if not a.startswith('__') and not callable(getattr(self, a))}
+    return config_dict
+
+  def check_equal(self, other):
+    # take either config object or config_dict
+    other_dict = other if isinstance(other, dict) else other.to_dict()
+    if not self.to_dict() == other_dict:
+      print(f"WARNING: GGNNConfig.check_equal() FAILED:\nself and other are unequal: "
+            f"The difference is {set(self.to_dict()) ^ set(other.to_dict())}.\n self={self.to_dict()}\n other={other_dict}")

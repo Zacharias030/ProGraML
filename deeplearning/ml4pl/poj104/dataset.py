@@ -1,5 +1,6 @@
 # better dataloader
 from pathlib import Path
+import pickle
 
 import tqdm
 import torch
@@ -72,6 +73,7 @@ class POJ104Dataset(InMemoryDataset):
             # just get the split and save it
             self.data, self.slices = torch.load(full_dataset)
             self._save_train_subset()
+            print(f"Saved train_subset={self.train_subset} with seed={self.train_subset_seed} to disk.")
             return
 
         # ~~~~~ we need to create the full dataset ~~~~~~~~~~~
@@ -112,6 +114,3 @@ class POJ104Dataset(InMemoryDataset):
         # maybe save train_subset as well
         if not tuple(self.train_subset) == (0, 100) and self.split not in ['val', 'test']:
             self._save_train_subset()
-
-
-

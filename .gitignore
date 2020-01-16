@@ -22,3 +22,4 @@ llvm_mac
 third_party/py/tensorflow/BUILD
 llvm_linux
 bazel-genfiles
+deeplearning/ml4pl/poj104/classifyapp_logs
