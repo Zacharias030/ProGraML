@@ -106,9 +106,9 @@ class GGNNModel(nn.Module):
 
     return outputs
 
-    def num_parameters(self) -> int:
-        """Compute the number of trainable parameters in this nn.Module and its children."""
-        return sum(param.numel() for param in self.parameters(recurse=True) if param.requires_grad)
+  def num_parameters(self) -> int:
+    """Compute the number of trainable parameters in this nn.Module and its children."""
+    return sum(param.numel() for param in self.parameters(recurse=True) if param.requires_grad)
 
 
 #############################
