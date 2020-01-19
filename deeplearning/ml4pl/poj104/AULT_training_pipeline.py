@@ -38,7 +38,7 @@ template = """#!/bin/bash
 #SBATCH --mail-type=ALL
 #SBATCH --cpus-per-task=8
 #SBATCH --mail-user=zacharias.vf@gmail.com
-#SBATCH --exclude=ault07,ault08
+#SBATCH --exclude=ault07,ault08,ault20
 
 source /users/zfisches/.bash_profile;
 cd /users/zfisches/ProGraML;

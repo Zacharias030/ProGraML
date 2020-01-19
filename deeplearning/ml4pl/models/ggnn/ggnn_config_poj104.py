@@ -69,7 +69,7 @@ class GGNNConfig(object):
 
     for key in params:
       if hasattr(config, key):
-        getattr(config, key) == params[key]
+        setattr(config, key, params[key])
     return config
 
   def to_dict(self):

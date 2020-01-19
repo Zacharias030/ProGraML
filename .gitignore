@@ -23,4 +23,4 @@ third_party/py/tensorflow/BUILD
 llvm_linux
 bazel-genfiles
 deeplearning/ml4pl/poj104/classifyapp_logs
-deeplearning/ml4pl/scripts/**/run_*.sh
+deeplearning/ml4pl/scripts/poj104/sub10_ts2222_bs64
