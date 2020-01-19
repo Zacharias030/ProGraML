@@ -19,12 +19,12 @@ from typing import List
 class GGNNConfig(object):
   def __init__(self):
     # Training Hyperparameters
-    self.num_epochs = 100
+    self.num_epochs = 150
     self.batch_size = 32
     self.lr: float = 0.0005
     self.patience = 100
     self.clip_grad_norm: float = 0.0
-    self.train_subset = [0, 10]
+    self.train_subset = [0, 100]
     self.random_seed: int = 42
 
     ###############

@@ -339,7 +339,7 @@ class Learner(object):
         if not self.args.get('--skip_restore_config'):
             config = GGNNConfig.from_dict(config_dict)
             self.config = config
-            print(f'Restored self.config from checkpoint {str(path)}.')
+            print(f'*RESTORED* self.config from checkpoint {str(path)}.')
         else:
             print(f'Skipped restoring self.config from checkpoint!')
             self.config.check_equal(config_dict)
@@ -347,10 +347,10 @@ class Learner(object):
         test_only = self.args.get('--test', False)
         model = GGNNModel(self.config, test_only=test_only)
         model.load_state_dict(checkpoint['model_state_dict'])
-        print(f'Restored model parameters from checkpoint {str(path)}.')
+        print(f'*RESTORED* model parameters from checkpoint {str(path)}.')
         if not self.args.get('--test', None):  # only restore opt if needed. opt should be None o/w.
             model.opt.load_state_dict(checkpoint['optimizer_state_dict'])
-            print(f'Restored optimizer parameters from checkpoint as well.')
+            print(f'*RESTORED* optimizer parameters from checkpoint as well.')
         return model
 
 
