@@ -74,10 +74,13 @@ def config_generator():
         yield dict(zip(choices_dict.keys(), c))
 
 
-def write_runscripts(subfolder=''):
+def write_runscripts(subfolder):
     configs = list(config_generator())
     outpath = RUNSCRIPT_PATH / subfolder
     outpath.mkdir(exist_ok = True, parents=True)
+
+    print("Writing runscripts to:")
+    print(str(outpath.absolute()))
     
     readme = open(outpath / "README.txt", "w")
 
@@ -96,8 +99,8 @@ def write_runscripts(subfolder=''):
             }
         
         runscript = template.format(**template_format)
-        print(runscript)
-        print("\n")
+        #print(runscript)
+        #print("\n")
 
         with open(outpath / f"run_{i:03d}_{stmp}.sh", "w") as f:
             f.write(runscript)
@@ -113,4 +116,5 @@ if __name__ == "__main__":
     if len(args) > 0:
         write_runscripts(args[0])
     else:
-        write_runscripts()
+        print('Need to provide a subfolder name to write runscripts into!')
+        print('Usage: python AULT_training_pipeline.py <subfolder name>')

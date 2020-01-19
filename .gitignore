@@ -16,6 +16,7 @@ bazel-testlogs
 # Zach thesis stuff
 deeplearning/ml4pl/poj104/.ipynb_checkpoints/
 deeplearning/ml4pl/poj104/classifyapp_data
+deeplearning/ml4pl/poj104/classifyapp_data_copy
 deeplearning/ml4pl/poj104/classifyapp_data.zip
 **/*.DS_Store
 llvm_mac
@@ -23,4 +24,4 @@ third_party/py/tensorflow/BUILD
 llvm_linux
 bazel-genfiles
 deeplearning/ml4pl/poj104/classifyapp_logs
-deeplearning/ml4pl/scripts/poj104/sub10_ts2222_bs64
+deeplearning/ml4pl/scripts/poj104/sub10_ts4x2_bs64
