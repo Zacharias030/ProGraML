@@ -63,25 +63,34 @@ class GraphNodeEncoder(object):
     For each node, this sets the 'preprocessed_text' and 'x' attributes.
 
     Args:
-      g: The graph to encode the nodes of.
+      g: The graph to encode the nodes of. We assume the nodes to have 'text', i.e. lines of LLVM code.
     """
+    # get the 'text' for all statement nodes.
     lines = [
       [data["text"]]
       for _, data in g.nodes(data=True)
       if data["type"] == programl_pb2.Node.STATEMENT
     ]
+    # clean the lines
     preprocessed_lines, _ = inst2vec_preprocess.preprocess(lines)
+    # canonicalize the lines by removing identifier names etc.
     preprocessed_texts = [
+      # maybe lines were cleaned away completely, so test for ''
       inst2vec_preprocess.PreprocessStatement(x[0] if len(x) else "")
       for x in preprocessed_lines
     ]
+    # write canonicalized texts back to the nx graph
     for (node, data), text in zip(g.nodes(data=True), preprocessed_texts):
       if text:
         data["preprocessed_text"] = text
-        data["type"] = programl_pb2.Node.STATEMENT
-        data["x"] = [self.dictionary.get(data["text"], self.dictionary["!UNK"])]
+        data["type"] = programl_pb2.Node.STATEMENT # thats just int(0).
+        #TODO (ZACH) here I changed a line and fixed a bug.
+        # data["x"] = [self.dictionary.get(data["text"], self.dictionary["!UNK"])]
+        
+        # look up canonicalized statement text in dictionary, o/w !UNK
+        data["x"] = [self.dictionary.get(data["preprocessed_text"], self.dictionary["!UNK"])]
         data["y"] = []
-      else:
+      else: # cleaned away lines on statements shall be !UNK.
         data["preprocessed_text"] = "!UNK"
         data["type"] = programl_pb2.Node.STATEMENT
         data["x"] = [self.dictionary.get(data["text"], self.dictionary["!UNK"])]
