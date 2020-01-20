@@ -42,14 +42,13 @@ from deeplearning.ml4pl.poj104.dataset import POJ104Dataset
 
 class Learner(object):
     def __init__(self, args=None):
-        self.args = args
-
         # Make class work without file being run as main
-        if self.args is None:
-            self.args = docopt(__doc__, argv=[])
+        self.args = docopt(__doc__, argv=[])
+        if args:
+            self.args.update(args)
 
         # prepare logging
-        self.run_id = "_".join([time.strftime("%Y-%m-%d-%H-%M-%S"), str(os.getpid())])
+        self.run_id = "_".join([time.strftime("%Y-%m-%d-%H:%M:%S"), str(os.getpid())])
         log_dir = repo_root / self.args.get("--log_dir", '.')
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
@@ -88,7 +87,7 @@ class Learner(object):
         self.data_dir = repo_root / self.args.get('--data_dir', '.')
         self.valid_data = DataLoader(POJ104Dataset(root=self.data_dir, split='val'), batch_size=self.config.batch_size * 2, shuffle=False)
         self.test_data = DataLoader(POJ104Dataset(root=self.data_dir, split='test'), batch_size=self.config.batch_size * 2, shuffle=False)
-        
+
         self.train_data = None
         if not self.args.get('--test', None):
             self.train_data = DataLoader(POJ104Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset), batch_size=self.config.batch_size, shuffle=True)
@@ -101,6 +100,33 @@ class Learner(object):
             "Run %s starting with following parameters:\n%s"
             % (self.run_id, json.dumps(config_dict))
         )
+
+    def data2input(self, batch):
+        """Glue method that converts a batch from the dataloader into the input format of the model"""
+        num_graphs = batch.batch[-1].item() + 1
+
+        edge_lists = []
+        edge_positions = [] if self.config.position_embeddings else None
+        for i in range(3):
+            # mask by edge type
+            mask = batch.edge_attr[:, 0].squeeze() == i # <M_i>
+            edge_list = batch.edge_index[:, mask].t()
+            edge_lists.append(edge_list)
+
+            if self.config.position_embeddings:
+                edge_pos = batch.edge_attr[mask, 1]
+                edge_positions.append(edge_pos)
+
+        inputs = {
+            "vocab_ids": batch.x[:,0].squeeze(),
+            "labels": batch.y - 1, # labels start at 0!!!
+            "edge_lists": edge_lists,
+            "pos_lists": edge_positions,
+            "num_graphs": num_graphs,
+            "graph_nodes_list": batch.batch,
+            #"node_types": batch.x[:,1].squeeze(),
+        }
+        return inputs
 
     def run_epoch(self, loader, epoch_type):
         """
@@ -119,25 +145,13 @@ class Learner(object):
         processed_graphs = 0
 
         for step, batch in enumerate(loader):
-            num_graphs = batch.batch[-1].item() + 1
-            processed_graphs += num_graphs
-
             ######### prepare input
             # move batch to gpu and prepare input tensors:
             batch.to(self.model.dev)
 
-            edge_lists = []
-            edge_positions = [] if self.config.position_embeddings else None
-            for i in range(3):
-                # mask by edge type
-                mask = batch.edge_attr[:, 0].squeeze() == i # <M_i>
-                edge_list = batch.edge_index[:, mask].t()
-                edge_lists.append(edge_list)
-                
-                if self.config.position_embeddings:
-                    edge_pos = batch.edge_attr[mask, 1]
-                    edge_positions.append(edge_pos)
-
+            inputs = self.data2input(batch)
+            num_graphs = inputs['num_graphs']
+            processed_graphs += num_graphs
 
             #############
             # RUN MODEL FORWARD PASS
@@ -145,39 +159,17 @@ class Learner(object):
             # enter correct mode of model
             if epoch_type == "train":
                 self.global_training_step += 1
-
                 if not self.model.training:
                     self.model.train()
-                outputs = self.model(
-                    vocab_ids=batch.x.squeeze(),
-                    labels=batch.y - 1, # labels start at 0!!!
-                    edge_lists=edge_lists,
-                    pos_lists=edge_positions,
-                    num_graphs=num_graphs,
-                    graph_nodes_list=batch.batch,
-                )
+                outputs = self.model(**inputs)
             else:  # not TRAIN
                 if self.model.training:
                     self.model.eval()
                     self.model.opt.zero_grad()
                 with torch.no_grad():  # don't trace computation graph!
-                    outputs = self.model(
-                        vocab_ids=batch.x.squeeze(),
-                        labels=batch.y - 1,
-                        edge_lists=edge_lists,
-                        pos_lists=edge_positions,
-                        num_graphs=num_graphs,
-                        graph_nodes_list=batch.batch,
-                    )
+                    outputs = self.model(**inputs)
 
-            (
-                logits,
-                accuracy,
-                logits,
-                correct,
-                targets,
-                graph_features,
-                *unroll_stats,
+            (logits, accuracy, logits, correct, targets, graph_features, *unroll_stats,
             ) = outputs
 
             loss = self.model.loss((logits, graph_features), targets)
@@ -186,12 +178,6 @@ class Learner(object):
 
             if epoch_type == "train":
                 loss.backward()
-                # TODO(github.com/ChrisCummins/ProGraML/issues/27):: Clip gradients
-                # (done). NB, pytorch clips by norm of the gradient of the model, while
-                # tf clips by norm of the grad of each tensor separately. Therefore we
-                # change default from 1.0 to 6.0.
-                # TODO(github.com/ChrisCummins/ProGraML/issues/27):: Anyway: Gradients
-                # shouldn't really be clipped if not necessary?
                 if self.model.config.clip_grad_norm > 0.0:
                     torch.nn.utils.clip_grad_norm_(
                         self.model.parameters(), self.model.config.clip_grad_norm
@@ -343,7 +329,7 @@ class Learner(object):
         else:
             print(f'Skipped restoring self.config from checkpoint!')
             self.config.check_equal(config_dict)
-        
+
         test_only = self.args.get('--test', False)
         model = GGNNModel(self.config, test_only=test_only)
         model.load_state_dict(checkpoint['model_state_dict'])
