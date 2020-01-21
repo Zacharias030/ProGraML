@@ -52,12 +52,14 @@ class GGNNConfig(object):
         self.num_classes: int = 104
         self.edge_type_count: int = 3
         self.has_graph_labels: bool = True
-        self.has_aux_input: bool = False
         self.vocab_size: int = 8568
         self.inst2vec_embeddings = 'random' #  One of {zero, constant, random, random_const, finetune}
+        
+        # could be made optional        
         self.use_selector_embeddings: bool = False
         self.selector_size: int = 2 if self.use_selector_embeddings else 0
         self.hidden_size: int = self.emb_size + self.selector_size
+        
 
 
     @classmethod

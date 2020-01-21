@@ -11,10 +11,11 @@ print(repo_root)
 sys.path.insert(1, repo_root)
 repo_root = Path(repo_root)
 
-from deeplearning.ml4pl.poj104.AULT_example_runscript_config import template, choices_dict, subfolder
 
-RUNSCRIPT_PATH = repo_root / 'deeplearning' / 'ml4pl' / 'scripts' / 'poj104'
-RUNSCRIPT_PATH.mkdir(parents=True, exist_ok=True)
+from deeplearning.ml4pl.models.ggnn.ggnn_config_poj104 import GGNNConfig
+
+SCRIPTS_FOLDER = repo_root / 'deeplearning' / 'ml4pl' / 'scripts' / 'poj104'
+SCRIPTS_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
 def stamp(stuff):
@@ -29,19 +30,21 @@ def config_generator(choices_dict):
     value_list = [choices_dict[k] for k in choices_dict]
     configs = list(itertools.product(*value_list))
     for c in configs:
-        yield dict(zip(choices_dict.keys(), c))
+        manual_choices = dict(zip(choices_dict.keys(), c))
+        config_dict = GGNNConfig.from_dict(manual_choices).to_dict()
+        yield config_dict
 
 
-def write_runscripts(subfolder=subfolder, template=template, choices_dict=choices_dict):
+def write_runscripts(subfolder, template, choices_dict):
     configs = list(config_generator(choices_dict))
-    outpath = RUNSCRIPT_PATH / subfolder
+    outpath = SCRIPTS_FOLDER / subfolder
     outpath.mkdir(exist_ok = True, parents=True)
 
     print("Writing runscripts to:")
     print(str(outpath.absolute()))
     
     readme = open(outpath / "README.txt", "w")
-    print(f"Writing runscripts to {subfolder} with the following choices_dict configuration:\n{choices_dict}\n.", file=readme)
+    print(f"Writing runscripts to {subfolder} with the following choices_dict configuration:\n{choices_dict}\n", file=readme)
 
     for i, config in enumerate(configs):
         stmp = stamp(config)
@@ -63,7 +66,7 @@ def write_runscripts(subfolder=subfolder, template=template, choices_dict=choice
 
         with open(outpath / f"run_{i:03d}_{stmp}.sh", "w") as f:
             f.write(runscript)
-            f.write(f"\n# HyperOpt-{i:03d}-{stmp}:")
+            f.write(f"\n\n# HyperOpt-{i:03d}-{stmp}:")
             f.write(f"\n# {config}\n")
     
     readme.close()
@@ -71,9 +74,10 @@ def write_runscripts(subfolder=subfolder, template=template, choices_dict=choice
 
 
 if __name__ == "__main__":
+    from deeplearning.ml4pl.poj104.AULT_example_runscript_config import template, choices_dict, subfolder
+
     args = sys.argv[1:]
     if len(args) > 0:
-        write_runscripts(args[0])
+        print('Usage: python AULT_training_pipeline.py')
     else:
-        print('Need to provide a subfolder name to write runscripts into!')
-        print('Usage: python AULT_training_pipeline.py <subfolder name>')
+        write_runscripts(subfolder=subfolder, template=template, choices_dict=choices_dict)

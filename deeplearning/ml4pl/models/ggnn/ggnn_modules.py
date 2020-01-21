@@ -135,7 +135,7 @@ class Loss(nn.Module):
     def forward(self, inputs, targets):
         """inputs: (predictions) or (predictions, intermediate_predictions)"""
         loss = self.loss(inputs[0], targets)
-        if self.config.has_aux_input:
+        if hasattr(self.config, 'has_aux_input') and self.config.has_aux_input:
             loss += self.config.intermediate_loss_weight * self.loss(
                 inputs[1], targets
             )
@@ -231,7 +231,7 @@ class NodeEmbeddings(nn.Module):
         else:
             raise NotImplementedError(config.inst2vec_embeddings)
 
-        if config.use_selector_embeddings:
+        if hasattr(config, 'use_selector_embeddings') and config.use_selector_embeddings:
             selector_init = torch.tensor(
                 # TODO(github.com/ChrisCummins/ProGraML/issues/27): x50 is maybe a
                 # problem for unrolling (for selector_embs)?

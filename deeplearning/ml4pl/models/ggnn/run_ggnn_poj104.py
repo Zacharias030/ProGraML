@@ -66,7 +66,7 @@ class Learner(object):
         elif self.args.get('--config_json', None) is not None:
             config_string = args['--config_json']
             # accept single quoted 'json'. This only works bc our json strings are simple enough.
-            config_string = config_string.replace("'", '"')
+            config_string = config_string.replace("'", '"').replace('True', 'true').replace('False', 'false')
             params = json.loads(config_string)
         self.config = GGNNConfig.from_dict(params=params)
 
