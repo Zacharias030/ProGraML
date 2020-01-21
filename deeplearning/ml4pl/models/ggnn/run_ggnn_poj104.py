@@ -109,7 +109,7 @@ class Learner(object):
         edge_positions = [] if self.config.position_embeddings else None
         for i in range(3):
             # mask by edge type
-            mask = batch.edge_attr[:, 0].squeeze() == i # <M_i>
+            mask = batch.edge_attr[:, 0] == i # <M_i>
             edge_list = batch.edge_index[:, mask].t()
             edge_lists.append(edge_list)
 
@@ -118,13 +118,13 @@ class Learner(object):
                 edge_positions.append(edge_pos)
 
         inputs = {
-            "vocab_ids": batch.x[:,0].squeeze(),
+            "vocab_ids": batch.x[:,0],
             "labels": batch.y - 1, # labels start at 0!!!
             "edge_lists": edge_lists,
             "pos_lists": edge_positions,
             "num_graphs": num_graphs,
             "graph_nodes_list": batch.batch,
-            #"node_types": batch.x[:,1].squeeze(),
+            #"node_types": batch.x[:,1],
         }
         return inputs
 
