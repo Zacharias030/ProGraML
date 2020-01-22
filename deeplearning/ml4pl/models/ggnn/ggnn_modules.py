@@ -213,6 +213,8 @@ class NodeEmbeddings(nn.Module):
 
     def __init__(self, config, pretrained_embeddings=None):
         super().__init__()
+        self.inst2vec_embeddings = config.inst2vec_embeddings
+        self.emb_size = config.emb_size
 
         if config.inst2vec_embeddings == "constant":
             app.Log(1, "Using pre-trained inst2vec embeddings frozen.")
@@ -235,6 +237,9 @@ class NodeEmbeddings(nn.Module):
         elif config.inst2vec_embeddings == "random":
             app.Log(1, "Initializing with random embeddings")
             self.node_embs = nn.Embedding(config.vocab_size, config.emb_size)
+        elif config.inst2vec_embeddings == "none":
+            app.Log(1, "Initializing with a embedding for statements and identifiers each.")
+            self.node_embs = nn.Embedding(2, config.emb_size)
         else:
             raise NotImplementedError(config.inst2vec_embeddings)
 
@@ -252,7 +257,13 @@ class NodeEmbeddings(nn.Module):
             self.selector_embs = None
 
     def forward(self, vocab_ids, selector_ids=None):
-        embs = self.node_embs(vocab_ids)
+        if self.inst2vec_embeddings == 'none':
+            # map IDs to 1 and everything else to 0
+            ids = (vocab_ids == 8565).to(torch.long)  # !IDENTIFIER token id
+            embs = self.node_embs(ids)
+        else:  # normal embeddings
+            embs = self.node_embs(vocab_ids)
+
         if self.selector_embs:
             selector_embs = self.selector_embs(selector_ids)
             embs = torch.cat((embs, selector_embs), dim=1)
