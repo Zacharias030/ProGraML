@@ -41,9 +41,16 @@ class GGNNModel(nn.Module):
     def __init__(self, config, pretrained_embeddings=None, test_only=False):
         super().__init__()
         self.config = config
+        
+        # input layer
         self.node_embeddings = NodeEmbeddings(config, pretrained_embeddings)
+
+        # GNN
         self.ggnn = GGNNProper(config)
+
+        # Readout layer
         self.readout = Readout(config)
+
         # make readout available to label_convergence tests in GGNN Proper (at runtime)
         if hasattr(self.config, 'unroll_strategy') and self.config.unroll_strategy == "label_convergence":
             self.ggnn.readout = self.readout
@@ -270,6 +277,7 @@ class GGNNProper(nn.Module):
         self.label_conv_threshold = config.label_conv_threshold if hasattr(config, 'label_conv_threshold') else 0.995
         self.label_conv_stable_steps = config.label_conv_stable_steps if hasattr(config, 'label_conv_stable_steps') else 1
 
+        # Message and update layers
         self.message = nn.ModuleList()
         for i in range(len(self.layer_timesteps)):
             self.message.append(MessagingLayer(config))
@@ -380,8 +388,6 @@ class MessagingLayer(nn.Module):
         self.msg_mean_aggregation = config.msg_mean_aggregation
         self.dim = config.hidden_size
 
-        # TODO(github.com/ChrisCummins/ProGraML/issues/27): why do edges carry no
-        # bias? Seems restrictive. Now they can, maybe default corr. FLAG to true?
         self.transform = LinearNet(
             self.dim,
             self.dim * self.forward_and_backward_edge_type_count,
@@ -460,15 +466,31 @@ class GGNNLayer(nn.Module):
         # TODO(github.com/ChrisCummins/ProGraML/issues/27): Maybe decouple hidden
         # GRU size: make hidden GRU size larger and EdgeTrafo size non-square
         # instead? Or implement stacking gru layers between message passing steps.
+
         self.gru = nn.GRUCell(
             input_size=config.hidden_size, hidden_size=config.hidden_size
         )
 
-    def forward(self, messages, node_states):
+        # currently only admits node types 0 and 1 for statements and identifiers.
+        self.use_node_types = config.use_node_types if hasattr(config, 'use_node_types') else False        
+        if self.use_node_types:
+            self.id_gru = nn.GRUCell(
+                input_size=config.hidden_size, hidden_size=config.hidden_size
+            )
+
+    def forward(self, messages, node_states, node_types=None):
         #if self.dropout > 0.0:
         #  F.dropout_(messages, p=self.dropout, training=self.training, inplace=True)
 
-        output = self.gru(messages, node_states)
+        if self.use_node_types:
+            assert node_types, "Need to provide node_types <N> if config.use_node_types!"
+            output = torch.zeros_like(node_states, device=node_states.device)
+            stmt_mask = node_types == 0
+            output[stmt_mask] = self.gru(messages[stmt_mask], node_states[stmt_mask])
+            id_mask = node_types == 1
+            output[id_mask] = self.id_gru(messages[id_mask], node_states[id_mask])
+        else:
+            output = self.gru(messages, node_states)
 
         if self.dropout > 0.0:
             F.dropout(output, p=self.dropout, training=self.training, inplace=True)

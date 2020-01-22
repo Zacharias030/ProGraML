@@ -31,8 +31,11 @@ class GGNNConfig(object):
         # Model Hyperparameters
         self.layer_timesteps: List[int] = [2, 2, 2]
         self.emb_size: int = 200
-
+        # currently only admits node types 0 and 1 for statements and identifiers.
+        self.use_node_types = False
         self.use_edge_bias: bool = True
+        
+        # Aggregate by mean or by sum
         self.msg_mean_aggregation: bool = True
         self.backward_edges: bool = True
 
@@ -52,14 +55,13 @@ class GGNNConfig(object):
         self.num_classes: int = 104
         self.edge_type_count: int = 3
         self.has_graph_labels: bool = True
+        self.has_aux_input: bool = False
         self.vocab_size: int = 8568
         self.inst2vec_embeddings = 'random' #  One of {zero, constant, random, random_const, finetune}
-        
-        # could be made optional        
+        # could be made optional 
         self.use_selector_embeddings: bool = False
         self.selector_size: int = 2 if self.use_selector_embeddings else 0
         self.hidden_size: int = self.emb_size + self.selector_size
-        
 
 
     @classmethod
