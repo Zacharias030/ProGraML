@@ -25,3 +25,6 @@ llvm_linux
 bazel-genfiles
 deeplearning/ml4pl/poj104/classifyapp_logs
 deeplearning/ml4pl/scripts/poj104/sub10_ts4x2_bs64
+deeplearning/ml4pl/scripts/**/*.out
+deeplearning/ml4pl/scripts/**/run_*.sh
+deeplearning/ml4pl/scripts/**/README.txt

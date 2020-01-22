@@ -3,7 +3,7 @@
 
 
 
-subfolder = 'basic_run_full_subset_01-21_weird_testset'
+subfolder = 'large_run_full_subset'
 
 template = """#!/bin/bash
 #SBATCH --job-name=poj{i:03d}
@@ -23,17 +23,17 @@ srun python deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py \
 --config_json="{config_str}" \
 """  # NO WHITESPACE!!!
 
+
+# iterates over last item 'the quickest' and first item the slowest!
 choices_dict = {
-    'layer_timesteps': [[2,2,2], [2,2,2,2]],  # , [2,2,2,2], [1,1,1,1,1,1]],
-    'lr': [0.0005, 0.001],
-    'batch_size': [128], #[32, 128],
-    #'output_dropout': [0.0]  #, 0.2, 0.5],
-    #'edge_weight_dropout': [0.0, 0.1, 0.2],
-    'graph_state_dropout': [0.1],  #[0.0, 0.05, 0.1, 0.2],
+    'edge_weight_dropout': [0.0, 0.1], #, 0.2],
+    'layer_timesteps': [[2,2,2,2], [2,2,2]],  # , [2,2,2,2], [1,1,1,1,1,1]],
+    'output_dropout': [0.0, 0.2],  #, 0.2, 0.5],
+    'graph_state_dropout': [0.1, 0.0, 0.2],  #[0.0, 0.05, 0.1, 0.2],    
+    'batch_size': [128, 256, 64], #[32, 128],    
+    'lr': [0.0005, 0.00025, 0.0001],
     'train_subset': [[0,100]],
     }
-
-
 
 
 # make this file executable from anywhere
