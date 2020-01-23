@@ -3,19 +3,20 @@
 ########### Make your changes below the line ######################
 
 # subfolder under classifyapp_logs/
-subfolder = 'test_run_with_node_types'
+subfolder = 'run_with_node_types_and_structure_only'
 
 # choose 3 letters to identify your experiment
 jobname = 'nty'
 
 # 4h runtime per submission
-resubmit_times_per_job = 3
+resubmit_times_per_job = 4
 
 # a set of hyperparameters to grid search over
 choices_dict = {
-    'num_epochs': [5],
-    'train_subset': [[0,10]],
-    'use_node_types':[True, False],
+    'num_epochs': [20],
+    'train_subset': [[0,100]],
+    'use_node_types': [True, False],
+    'inst2vec_embeddings': ['random', 'none'],
     }
 
 
