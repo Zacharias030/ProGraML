@@ -87,12 +87,13 @@ class GGNNModel(nn.Module):
         pos_lists=None,
         num_graphs=None,
         graph_nodes_list=None,
+        node_types=None,
         aux_in=None,
         test_time_steps=None,
     ):
         raw_in = self.node_embeddings(vocab_ids, selector_ids)
         raw_out, raw_in, *unroll_stats = self.ggnn(
-            edge_lists, raw_in, pos_lists, test_time_steps
+            edge_lists, raw_in, pos_lists, node_types, test_time_steps
         )  # OBS! self.ggnn might change raw_in inplace, so use the two outputs
         # instead!
 
@@ -298,7 +299,7 @@ class GGNNProper(nn.Module):
         for i in range(len(self.layer_timesteps)):
             self.update.append(GGNNLayer(config))
 
-    def forward(self, edge_lists, node_states, pos_lists=None, test_time_steps=None):
+    def forward(self, edge_lists, node_states, pos_lists=None, node_types=None, test_time_steps=None):
         old_node_states = node_states.clone()
 
         # we allow for some fancy unrolling strategies.
@@ -319,7 +320,7 @@ class GGNNProper(nn.Module):
             layer_timesteps = [min(test_time_steps, self.max_timesteps)]
         elif self.unroll_strategy == "label_convergence":
             node_states, unroll_steps, converged = self.label_convergence_forward(
-                edge_lists, node_states, pos_lists, initial_node_states=old_node_states
+                edge_lists, node_states, pos_lists, node_types, initial_node_states=old_node_states
             )
             return node_states, old_node_states, unroll_steps, converged
 
@@ -334,11 +335,11 @@ class GGNNProper(nn.Module):
         for (layer_idx, num_timesteps) in enumerate(layer_timesteps):
             for t in range(num_timesteps):
                 messages = self.message[layer_idx](edge_lists, node_states, pos_lists)
-                node_states = self.update[layer_idx](messages, node_states)
+                node_states = self.update[layer_idx](messages, node_states, node_types)
         return node_states, old_node_states
 
     def label_convergence_forward(
-        self, edge_lists, node_states, pos_lists, initial_node_states
+        self, edge_lists, node_states, pos_lists, node_types, initial_node_states
     ):
         assert (
             len(self.layer_timesteps) == 1
@@ -356,7 +357,7 @@ class GGNNProper(nn.Module):
 
         while True:
             messages = self.message[0](edge_lists, node_states, pos_lists)
-            node_states = self.update[0](messages, node_states)
+            node_states = self.update[0](messages, node_states, node_types)
             new_tentative_labels = self.tentative_labels(
                 initial_node_states, node_states
             )
@@ -499,7 +500,7 @@ class GGNNLayer(nn.Module):
         #  F.dropout_(messages, p=self.dropout, training=self.training, inplace=True)
 
         if self.use_node_types:
-            assert node_types, "Need to provide node_types <N> if config.use_node_types!"
+            assert node_types is not None, "Need to provide node_types <N> if config.use_node_types!"
             output = torch.zeros_like(node_states, device=node_states.device)
             stmt_mask = node_types == 0
             output[stmt_mask] = self.gru(messages[stmt_mask], node_states[stmt_mask])

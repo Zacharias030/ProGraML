@@ -35,14 +35,14 @@ def config_generator(choices_dict):
         yield config_dict
 
 
-def write_runscripts(subfolder, template, choices_dict):
+def write_runscripts(subfolder, template, choices_dict, jobname, steps):
     configs = list(config_generator(choices_dict))
     outpath = SCRIPTS_FOLDER / subfolder
     outpath.mkdir(exist_ok = True, parents=True)
 
     print("Writing runscripts to:")
     print(str(outpath.absolute()))
-    
+
     readme = open(outpath / "README.txt", "w")
     print(f"Writing runscripts to {subfolder} with the following choices_dict configuration:\n{choices_dict}\n", file=readme)
 
@@ -51,33 +51,40 @@ def write_runscripts(subfolder, template, choices_dict):
 
         # log config to readme
         print(f"HyperOpt-{i:03d}-{stmp}: " + str(config), file=readme)
-        
-        template_format = {
-            #"stamp": stmp,
-            "i": i,
-            "timelimit": "04:00:00",
-            "config_str": str(config).replace('"', "'"),
-            "subfolder": subfolder,
-            }
-        
-        runscript = template.format(**template_format)
-        #print(runscript)
-        #print("\n")
 
-        with open(outpath / f"run_{i:03d}_{stmp}.sh", "w") as f:
-            f.write(runscript)
-            f.write(f"\n\n# HyperOpt-{i:03d}-{stmp}:")
-            f.write(f"\n# {config}\n")
-    
+        # write the chained resubmit runscripts
+        for j in range(steps):
+            resto_str = ''
+            if j > 0:
+                resto_str = f'--restore_by_pattern {jobname}{i:03d}'
+            template_format = {
+                #"stamp": stmp,
+                "i": i,
+                "timelimit": "04:00:00",
+                "config_str": str(config).replace('"', "'"),
+                "subfolder": subfolder,
+                "jobname": jobname,
+                "restore_by_pattern": resto_str,
+                }
+
+            runscript = template.format(**template_format)
+            #print(runscript)
+            #print("\n")
+
+            with open(outpath / f"run_{jobname}{i:03d}_{stmp}_step{j:02d}.sh", "w") as f:
+                f.write(runscript)
+                f.write(f"\n\n# HyperOpt-{i:03d}-{stmp}:")
+                f.write(f"\n# {config}\n")
+
     readme.close()
     print("Success.")
 
 
 if __name__ == "__main__":
-    from deeplearning.ml4pl.poj104.AULT_example_runscript_config import template, choices_dict, subfolder
+    from deeplearning.ml4pl.poj104.AULT_example_runscript_config import template, choices_dict, subfolder, resubmit_template, jobname, resubmit_times_per_job
 
     args = sys.argv[1:]
     if len(args) > 0:
         print('Usage: python AULT_training_pipeline.py')
     else:
-        write_runscripts(subfolder=subfolder, template=template, choices_dict=choices_dict)
+        write_runscripts(subfolder=subfolder, template=template, choices_dict=choices_dict, jobname=jobname, steps=resubmit_times_per_job)

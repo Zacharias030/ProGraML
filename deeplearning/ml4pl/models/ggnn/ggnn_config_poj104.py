@@ -19,9 +19,9 @@ from typing import List
 class GGNNConfig(object):
     def __init__(self):
         # Training Hyperparameters
-        self.num_epochs = 150
-        self.batch_size = 32
-        self.lr: float = 0.0005
+        self.num_epochs = 25
+        self.batch_size = 128
+        self.lr: float = 0.00025
         self.patience = 100
         self.clip_grad_norm: float = 0.0
         self.train_subset = [0, 100]
@@ -29,7 +29,7 @@ class GGNNConfig(object):
 
         ###############
         # Model Hyperparameters
-        self.layer_timesteps: List[int] = [2, 2, 2]
+        self.layer_timesteps: List[int] = [2, 2, 2, 2]
         self.emb_size: int = 200
         # currently only admits node types 0 and 1 for statements and identifiers.
         self.use_node_types: bool = False
@@ -43,7 +43,7 @@ class GGNNConfig(object):
         # Regularization
         self.output_dropout: float = 0.0  # dropout prob = 1-keep_prob
         self.edge_weight_dropout: float = 0.0
-        self.graph_state_dropout: float = 0.1
+        self.graph_state_dropout: float = 0.2
 
         # TODO(github.com/ChrisCummins/ProGraML/issues/27):: Maybe refactor non-rectangular edge passing matrices for independent hidden size.
         # hidden size of the whole model

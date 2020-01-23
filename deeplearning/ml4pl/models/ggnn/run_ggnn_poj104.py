@@ -13,6 +13,9 @@ Options:
     --restore CHECKPOINT            Path(*) to a model file to restore from.
     --skip_restore_config           Whether to skip restoring the config from CHECKPOINT.
     --test                          Test the model without training.
+    --restore_by_pattern PATTERN       Restore newest model of this name from log_dir and
+                                        continue training. (AULT specific!)
+                                        PATTERN is a string that can be grep'ed for.
 """
 
 import pickle, time, os, json, sys
@@ -39,6 +42,8 @@ repo_root = Path(repo_root)
 # Slurm gives us among others: SLURM_JOBID, SLURM_JOB_NAME, 
 # SLURM_JOB_DEPENDENCY (set to the value of the --dependency option)
 if os.environ.get('SLURM_JOBID'):
+    print('SLURM_JOB_NAME', os.environ.get('SLURM_JOB_NAME', ''))
+    print('SLURM_JOBID', os.environ.get('SLURM_JOBID', ''))
     RUN_ID = "_".join([os.environ.get('SLURM_JOB_NAME', ''), os.environ.get('SLURM_JOBID')])
 else:
     RUN_ID = str(os.getpid())
@@ -56,23 +61,21 @@ class Learner(object):
             self.args.update(args)
 
         # prepare logging
-        self.run_id = "_".join([time.strftime("%Y-%m-%d_%H:%M:%S"), RUN_ID])
+        self.parent_run_id = None  # for restored models
+        self.run_id = f"{time.strftime('%Y-%m-%d_%H:%M:%S')}_{RUN_ID}"
         log_dir = repo_root / self.args.get("--log_dir", '.')
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-        self.log_file = os.path.join(log_dir, "%s_log.json" % self.run_id)
-        # self.test_log_file = os.path.join(log_dir, f"{self.run_id}_test_log.json")
-        self.best_model_file = os.path.join(
-            log_dir, "%s_model_best.pickle" % self.run_id
-        )
+        log_dir.mkdir(parents=True, exist_ok=True)    
+        self.log_file = log_dir / f"{self.run_id}_log.json"
+        self.best_model_file = log_dir / f"{self.run_id}_model_best.pickle"
+        self.last_model_file = log_dir / f"{self.run_id}_model_last.pickle"
 
         # load config
         params = None
-        if self.args.get('--config', None) is not None:
+        if self.args.get('--config'):
             with open(repo_root / self.args['--config'], 'r') as f:
                 params = json.load(f)
-        elif self.args.get('--config_json', None) is not None:
-            config_string = args['--config_json']
+        elif self.args.get('--config_json'):
+            config_string = self.args['--config_json']
             # accept single quoted 'json'. This only works bc our json strings are simple enough.
             config_string = config_string.replace("'", '"').replace('True', 'true').replace('False', 'false')
             params = json.loads(config_string)
@@ -83,8 +86,10 @@ class Learner(object):
         np.random.seed(self.config.random_seed)
 
         # create / restore model
-        if self.args.get('--restore', None) is not None:
+        if self.args.get('--restore'):
             self.model = self.restore_model(path=repo_root / self.args['--restore'])
+        elif self.args.get('--restore_by_pattern'):
+            self.model = self.restore_by_pattern(pattern=self.args['--restore_by_pattern'], log_dir=log_dir)
         else: # initialize fresh model
             self.global_training_step = 0
             self.current_epoch = 1
@@ -97,13 +102,23 @@ class Learner(object):
         self.test_data = DataLoader(POJ104Dataset(root=self.data_dir, split='test'), batch_size=self.config.batch_size * 2, shuffle=False)
 
         self.train_data = None
-        if not self.args.get('--test', None):
+        if not self.args.get('--test'):
             self.train_data = DataLoader(POJ104Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset), batch_size=self.config.batch_size, shuffle=True)
 
         # log config to file
         config_dict = self.config.to_dict()
-        with open(os.path.join(log_dir, "%s_params.json" % self.run_id), "w") as f:
+        with open(log_dir / f"{self.run_id}_params.json", "w") as f:
             json.dump(config_dict, f)
+        
+        # log parent run to file if run was restored
+        if self.parent_run_id:
+            with open(log_dir / f"{self.run_id}_parent.json", "w") as f:
+                json.dump({
+                    "parent": self.parent_run_id,
+                    "self": self.run_id,
+                    "self_config": config_dict,
+                })
+
         print(
             "Run %s starting with following parameters:\n%s"
             % (self.run_id, json.dumps(config_dict))
@@ -132,7 +147,7 @@ class Learner(object):
             "pos_lists": edge_positions,
             "num_graphs": num_graphs,
             "graph_nodes_list": batch.batch,
-            #"node_types": batch.x[:,1],
+            "node_types": batch.x[:,1],
         }
         return inputs
 
@@ -216,11 +231,12 @@ class Learner(object):
                 "\r\x1b[KResumed operation, initial cum. val. acc: %.5f"
                 % best_val_acc
             )
+            self.current_epoch += 1
         else:
             (best_val_acc, best_val_acc_epoch) = (0.0, 0)
 
         # Training loop over epochs
-        for epoch in range(self.current_epoch, self.config.num_epochs):
+        for epoch in range(self.current_epoch, self.current_epoch + self.config.num_epochs):
             print(f"== Epoch {epoch}/{self.config.num_epochs}")
 
             train_loss, train_acc, train_speed = self.run_epoch(
@@ -277,6 +293,8 @@ class Learner(object):
                     % self.config.patience
                 )
                 break
+        # save last model on finish of training
+        self.save_model(epoch, self.last_model_file)
 
     def test(self):
         log_to_save = []
@@ -322,10 +340,18 @@ class Learner(object):
         }
         torch.save(checkpoint, path)
 
+    def restore_by_pattern(self, pattern, log_dir):
+        """this will restore the last checkpoint of a run that is identifiable by
+        the pattern <pattern>. It could restore to model_last or model_best."""
+        checkpoints = list(log_dir.glob(f"*{pattern}*model*.p*"))
+        last_mod_checkpoint = sorted(checkpoints, key=os.path.getmtime)[-1]
+        assert last_mod_checkpoint.is_file(), f"Couldn't restore by jobname: No model files matching <{pattern}> found."
+        return self.restore_model(last_mod_checkpoint)
+
     def restore_model(self, path):
         """loads and restores a model from file."""
         checkpoint = torch.load(path)
-        self.run_id = checkpoint['run_id']
+        self.parent_run_id = checkpoint['run_id']
         self.global_training_step = checkpoint['global_training_step']
         self.current_epoch = checkpoint['epoch']
 
