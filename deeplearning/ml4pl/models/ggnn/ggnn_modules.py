@@ -280,6 +280,7 @@ class GGNNProper(nn.Module):
         super().__init__()
         self.backward_edges = config.backward_edges
         self.layer_timesteps = config.layer_timesteps
+        self.position_embeddings = config.position_embeddings
 
         # optional eval time unrolling parameter
         self.test_layer_timesteps = config.test_layer_timesteps if hasattr(config, 'test_layer_timesteps') else 0
@@ -325,6 +326,10 @@ class GGNNProper(nn.Module):
         if self.backward_edges:
             back_edge_lists = [x.flip([1]) for x in edge_lists]
             edge_lists.extend(back_edge_lists)
+            
+            # For backward edges we keep the positions of the forward edge!
+            if self.position_embeddings:
+                pos_lists.extend(pos_lists)
 
         for (layer_idx, num_timesteps) in enumerate(layer_timesteps):
             for t in range(num_timesteps):

@@ -36,6 +36,14 @@ sys.path.insert(1, repo_root)
 repo_root = Path(repo_root)
 
 
+# Slurm gives us among others: SLURM_JOBID, SLURM_JOB_NAME, 
+# SLURM_JOB_DEPENDENCY (set to the value of the --dependency option)
+if os.environ.get('SLURM_JOBID'):
+    RUN_ID = "_".join([os.environ.get('SLURM_JOB_NAME', ''), os.environ.get('SLURM_JOBID')])
+else:
+    RUN_ID = str(os.getpid())
+
+
 from deeplearning.ml4pl.models.ggnn.ggnn_modules import GGNNModel
 from deeplearning.ml4pl.models.ggnn.ggnn_config_poj104 import GGNNConfig
 from deeplearning.ml4pl.poj104.dataset import POJ104Dataset
@@ -48,12 +56,12 @@ class Learner(object):
             self.args.update(args)
 
         # prepare logging
-        self.run_id = "_".join([time.strftime("%Y-%m-%d-%H:%M:%S"), str(os.getpid())])
+        self.run_id = "_".join([time.strftime("%Y-%m-%d_%H:%M:%S"), RUN_ID])
         log_dir = repo_root / self.args.get("--log_dir", '.')
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         self.log_file = os.path.join(log_dir, "%s_log.json" % self.run_id)
-        self.test_log_file = os.path.join(log_dir, f"{self.run_id}_test_log.json")
+        # self.test_log_file = os.path.join(log_dir, f"{self.run_id}_test_log.json")
         self.best_model_file = os.path.join(
             log_dir, "%s_model_best.pickle" % self.run_id
         )
@@ -109,12 +117,12 @@ class Learner(object):
         edge_positions = [] if self.config.position_embeddings else None
         for i in range(3):
             # mask by edge type
-            mask = batch.edge_attr[:, 0] == i # <M_i>
-            edge_list = batch.edge_index[:, mask].t()
+            mask = batch.edge_attr[:, 0] == i          # <M_i>
+            edge_list = batch.edge_index[:, mask].t()  # <et, M_i>
             edge_lists.append(edge_list)
 
             if self.config.position_embeddings:
-                edge_pos = batch.edge_attr[mask, 1]
+                edge_pos = batch.edge_attr[mask, 1]    # <M_i>
                 edge_positions.append(edge_pos)
 
         inputs = {
