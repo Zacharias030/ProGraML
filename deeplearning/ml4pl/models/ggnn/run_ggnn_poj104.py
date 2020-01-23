@@ -117,7 +117,7 @@ class Learner(object):
                     "parent": self.parent_run_id,
                     "self": self.run_id,
                     "self_config": config_dict,
-                })
+                }, f)
 
         print(
             "Run %s starting with following parameters:\n%s"
