@@ -222,7 +222,7 @@ class Learner(object):
         total_time_start = time.time()
 
         # we enter training after restore
-        if self.args.get("--restore") is not None:
+        if self.parent_run_id is not None:
             print(f"== Epoch pre-validate epoch {self.current_epoch}")
             _, valid_acc, _, = self.run_epoch(self.valid_data, "val")
             best_val_acc = np.sum(valid_acc)
@@ -236,8 +236,9 @@ class Learner(object):
             (best_val_acc, best_val_acc_epoch) = (0.0, 0)
 
         # Training loop over epochs
-        for epoch in range(self.current_epoch, self.current_epoch + self.config.num_epochs):
-            print(f"== Epoch {epoch}/{self.config.num_epochs}")
+        target_epoch = self.current_epoch + self.config.num_epochs
+        for epoch in range(self.current_epoch, target_epoch):
+            print(f"== Epoch {epoch}/{target_epoch}")
 
             train_loss, train_acc, train_speed = self.run_epoch(
                 self.train_data, "train"
