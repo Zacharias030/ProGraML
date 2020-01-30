@@ -12,7 +12,7 @@ sys.path.insert(1, repo_root)
 repo_root = Path(repo_root)
 
 
-from deeplearning.ml4pl.models.ggnn.ggnn_config_poj104 import GGNNConfig
+from deeplearning.ml4pl.models.ggnn.configs import ProGraMLBaseConfig as BaseConfig
 
 SCRIPTS_FOLDER = repo_root / 'deeplearning' / 'ml4pl' / 'scripts' / 'poj104'
 SCRIPTS_FOLDER.mkdir(parents=True, exist_ok=True)
@@ -31,7 +31,7 @@ def config_generator(choices_dict):
     configs = list(itertools.product(*value_list))
     for c in configs:
         manual_choices = dict(zip(choices_dict.keys(), c))
-        config_dict = GGNNConfig.from_dict(manual_choices).to_dict()
+        config_dict = BaseConfig.from_dict(manual_choices).to_dict()
         yield config_dict
 
 

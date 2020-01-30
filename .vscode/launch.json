@@ -4,52 +4,102 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "Python: restore by name",
+            "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: run supervised",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
             "console": "integratedTerminal",
-            "args": ["--restore_by_pattern",
-                     "01-16"]
+            "args": [
+                "--log_dir",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "--model",
+                "ggnn",
+                "--dataset",
+                "poj104",
+                "--config_json",
+                "{'train_subset': [0, 10]}",
+            ]
+        },
+        {
+            "name": "Python: pretraining",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--model",
+                "ggnn_for_pretraining",
+                "--dataset",
+                "poj104",
+                "--log_dir",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "--config_json",
+                "{'train_subset': [0, 10], 'batch_size': 16}",
+            ]
+        },
+        {
+            "name": "Python: restore by pattern",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--restore_by_pattern",
+                "2020",
+                "--log_dir",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+            ]
         },
         {
             "name": "Python: run config_json",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
             "console": "integratedTerminal",
-            "args": ["--log_dir", "deeplearning/ml4pl/poj104/classifyapp_logs/example_subfolder/",
-                     "--config_json", "{'use_node_types': True, 'backward_edges': True, 'batch_size': 64, 'clip_grad_norm': 0.0, 'edge_type_count': 3, 'edge_weight_dropout': 0.0, 'emb_size': 200, 'graph_state_dropout': 0.1, 'has_aux_input': False, 'has_graph_labels': True, 'hidden_size': 200, 'inst2vec_embeddings': 'random', 'layer_timesteps': [2, 2, 2], 'lr': 0.0005, 'msg_mean_aggregation': True, 'num_classes': 104, 'num_epochs': 150, 'output_dropout': 0.0, 'patience': 100, 'position_embeddings': True, 'random_seed': 42, 'selector_size': 0, 'train_subset': [0, 10], 'use_edge_bias': True, 'use_selector_embeddings': False, 'vocab_size': 8568}"
-                    ]
+            "args": [
+                "--log_dir",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "--config_json",
+                "{'use_node_types': True, 'backward_edges': True, 'batch_size': 64, 'clip_grad_norm': 0.0, 'edge_type_count': 3, 'edge_weight_dropout': 0.0, 'emb_size': 200, 'graph_state_dropout': 0.1, 'has_aux_input': False, 'has_graph_labels': True, 'hidden_size': 200, 'inst2vec_embeddings': 'none', 'layer_timesteps': [2, 2, 2], 'lr': 0.0005, 'msg_mean_aggregation': True, 'num_classes': 104, 'num_epochs': 150, 'output_dropout': 0.0, 'patience': 100, 'position_embeddings': True, 'random_seed': 42, 'selector_size': 0, 'train_subset': [0, 10], 'use_edge_bias': True, 'use_selector_embeddings': False, 'vocab_size': 8568}"
+            ]
         },
         {
             "name": "Python: run config",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
             "console": "integratedTerminal",
-            "args": ["--config", "deeplearning/ml4pl/poj104/classifyapp_logs/2020-01-16-11-43-15_10290_params.json"
-                    ]
+            "args": [
+                "--config",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/2020-01-16-11-43-15_10290_params.json"
+            ]
         },
         {
             "name": "Python: run w/o args",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
             "console": "integratedTerminal",
-            "args": [
-                    ]
+            "args": []
         },
         {
             "name": "Python: run restore",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
             "console": "integratedTerminal",
-            "args": ["--restore", "deeplearning/ml4pl/poj104/classifyapp_logs/2020-01-14-01-15-04_24281_model_best.pickle",
-                    ]
+            "args": [
+                "--restore",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/2020-01-14-01-15-04_24281_model_best.pickle",
+            ]
         },
         {
             "name": "Python: Current File",

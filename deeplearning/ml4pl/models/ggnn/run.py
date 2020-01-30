@@ -1,6 +1,6 @@
 """
 Usage:
-   run_ggnn_poj104.py [options]
+   run.py [options]
 
 Options:
     -h --help                       Show this screen.
@@ -8,12 +8,14 @@ Options:
                                         [default: deeplearning/ml4pl/poj104/classifyapp_data]
     --log_dir LOG_DIR               Directory(*) to store logfiles and trained models relative to repository dir.
                                         [default: deeplearning/ml4pl/poj104/classifyapp_logs/]
+    --model MODEL                   The model to run [default: ggnn]
+    --dataset DATASET               The dataset to use [default: poj104]
     --config CONFIG                 Path(*) to a config json dump with params.
     --config_json CONFIG_JSON       Config json with params.
     --restore CHECKPOINT            Path(*) to a model file to restore from.
     --skip_restore_config           Whether to skip restoring the config from CHECKPOINT.
     --test                          Test the model without training.
-    --restore_by_pattern PATTERN       Restore newest model of this name from log_dir and
+    --restore_by_pattern PATTERN    Restore newest model of this name from log_dir and
                                         continue training. (AULT specific!)
                                         PATTERN is a string that can be grep'ed for.
 """
@@ -32,11 +34,33 @@ from torch_geometric.data import Data, DataLoader, InMemoryDataset
 #if __name__ == '__main__':
 full_path = os.path.realpath(__file__)
 print(full_path)
-repo_root = full_path.rsplit('ProGraML', maxsplit=1)[0] + 'ProGraML'
-print(repo_root)
+REPO_ROOT = full_path.rsplit('ProGraML', maxsplit=1)[0] + 'ProGraML'
+print(REPO_ROOT)
 #insert at 1, 0 is the script path (or '' in REPL)
-sys.path.insert(1, repo_root)
-repo_root = Path(repo_root)
+sys.path.insert(1, REPO_ROOT)
+REPO_ROOT = Path(REPO_ROOT)
+
+
+from deeplearning.ml4pl.models.ggnn.modeling import (
+    GGNNModel,
+    GGNNForPretrainingModel,
+    GraphTransformerModel,
+)
+from deeplearning.ml4pl.models.ggnn.configs import (
+    ProGraMLBaseConfig,
+    GGNN_POJ104_Config,
+    GGNN_POJ104_ForPretraining_Config,
+    GraphTransformerConfig,
+)
+from deeplearning.ml4pl.poj104.dataset import (
+    POJ104Dataset
+)
+
+# Importing twice like this enables restoring
+from deeplearning.ml4pl.models.ggnn import modeling
+from deeplearning.ml4pl.models.ggnn import configs
+
+
 
 
 # Slurm gives us among others: SLURM_JOBID, SLURM_JOB_NAME, 
@@ -49,12 +73,25 @@ else:
     RUN_ID = str(os.getpid())
 
 
-from deeplearning.ml4pl.models.ggnn.ggnn_modules import GGNNModel
-from deeplearning.ml4pl.models.ggnn.ggnn_config_poj104 import GGNNConfig
-from deeplearning.ml4pl.poj104.dataset import POJ104Dataset
+
+
+MODEL_CLASSES = {
+    'ggnn': (GGNNModel, GGNN_POJ104_Config),
+    'ggnn_for_pretraining': (GGNNForPretrainingModel, GGNN_POJ104_ForPretraining_Config),
+    'transformer': (GraphTransformerModel, GraphTransformerConfig),
+}
+
+DATASET_CLASSES = {
+    'poj104': POJ104Dataset,
+}
+
 
 class Learner(object):
-    def __init__(self, args=None):
+    def __init__(self, model, dataset, args=None):
+        # get model and dataset
+        Model, Config = MODEL_CLASSES[model]
+        Dataset = DATASET_CLASSES[dataset]
+        
         # Make class work without file being run as main
         self.args = docopt(__doc__, argv=[])
         if args:
@@ -63,47 +100,39 @@ class Learner(object):
         # prepare logging
         self.parent_run_id = None  # for restored models
         self.run_id = f"{time.strftime('%Y-%m-%d_%H:%M:%S')}_{RUN_ID}"
-        log_dir = repo_root / self.args.get("--log_dir", '.')
+        log_dir = REPO_ROOT / self.args.get("--log_dir", '.')
         log_dir.mkdir(parents=True, exist_ok=True)    
         self.log_file = log_dir / f"{self.run_id}_log.json"
         self.best_model_file = log_dir / f"{self.run_id}_model_best.pickle"
         self.last_model_file = log_dir / f"{self.run_id}_model_last.pickle"
 
         # load config
-        params = None
-        if self.args.get('--config'):
-            with open(repo_root / self.args['--config'], 'r') as f:
-                params = json.load(f)
-        elif self.args.get('--config_json'):
-            config_string = self.args['--config_json']
-            # accept single quoted 'json'. This only works bc our json strings are simple enough.
-            config_string = config_string.replace("'", '"').replace('True', 'true').replace('False', 'false')
-            params = json.loads(config_string)
-        self.config = GGNNConfig.from_dict(params=params)
+        params = self.parse_config_params(args)
+        self.config = Config.from_dict(params=params)
 
         # set seeds, NB: the NN on CUDA is partially non-deterministic!
         torch.manual_seed(self.config.random_seed)
         np.random.seed(self.config.random_seed)
 
-        # create / restore model
+        # load model
         if self.args.get('--restore'):
-            self.model = self.restore_model(path=repo_root / self.args['--restore'])
+            self.model = self.restore_model(path=REPO_ROOT / self.args['--restore'])
         elif self.args.get('--restore_by_pattern'):
             self.model = self.restore_by_pattern(pattern=self.args['--restore_by_pattern'], log_dir=log_dir)
         else: # initialize fresh model
             self.global_training_step = 0
             self.current_epoch = 1
             test_only = self.args.get('--test', False)
-            self.model = GGNNModel(self.config, test_only=test_only)
+            self.model = Model(self.config, test_only=test_only)
 
         # load data
-        self.data_dir = repo_root / self.args.get('--data_dir', '.')
-        self.valid_data = DataLoader(POJ104Dataset(root=self.data_dir, split='val'), batch_size=self.config.batch_size * 2, shuffle=False)
-        self.test_data = DataLoader(POJ104Dataset(root=self.data_dir, split='test'), batch_size=self.config.batch_size * 2, shuffle=False)
+        self.data_dir = REPO_ROOT / self.args.get('--data_dir', '.')
+        self.valid_data = DataLoader(Dataset(root=self.data_dir, split='val'), batch_size=self.config.batch_size * 2, shuffle=False)
+        self.test_data = DataLoader(Dataset(root=self.data_dir, split='test'), batch_size=self.config.batch_size * 2, shuffle=False)
 
         self.train_data = None
         if not self.args.get('--test'):
-            self.train_data = DataLoader(POJ104Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset), batch_size=self.config.batch_size, shuffle=True)
+            self.train_data = DataLoader(Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset), batch_size=self.config.batch_size, shuffle=True)
 
         # log config to file
         config_dict = self.config.to_dict()
@@ -124,19 +153,32 @@ class Learner(object):
             % (self.run_id, json.dumps(config_dict))
         )
 
+    def parse_config_params(self, args):
+        """Accesses self.args to parse config params from various flags."""
+        params = None
+        if args.get('--config'):
+            with open(REPO_ROOT / args['--config'], 'r') as f:
+                params = json.load(f)
+        elif args.get('--config_json'):
+            config_string = args['--config_json']
+            # accept single quoted 'json'. This only works bc our json strings are simple enough.
+            config_string = config_string.replace("'", '"').replace('True', 'true').replace('False', 'false')
+            params = json.loads(config_string)
+        return params
+
     def data2input(self, batch):
         """Glue method that converts a batch from the dataloader into the input format of the model"""
         num_graphs = batch.batch[-1].item() + 1
 
         edge_lists = []
-        edge_positions = [] if self.config.position_embeddings else None
+        edge_positions = [] if getattr(self.config, 'position_embeddings', False) else None
         for i in range(3):
             # mask by edge type
             mask = batch.edge_attr[:, 0] == i          # <M_i>
             edge_list = batch.edge_index[:, mask].t()  # <et, M_i>
             edge_lists.append(edge_list)
 
-            if self.config.position_embeddings:
+            if getattr(self.config, 'position_embeddings', False):
                 edge_pos = batch.edge_attr[mask, 1]    # <M_i>
                 edge_positions.append(edge_pos)
 
@@ -151,7 +193,44 @@ class Learner(object):
         }
         return inputs
 
-    def run_epoch(self, loader, epoch_type):
+    def bertify_batch(self, batch, config):
+        """takes a batch and returns the bertified input, labels and corresponding mask,
+        indicating what part of the input to predict."""
+        vocab_ids = batch.x[:, 0]
+        labels = vocab_ids.clone()
+        node_types = batch.x[:, 1]
+        device = vocab_ids.device
+        
+        # we create a tensor that carries the probability of being masked for each node
+        probabilities = torch.full(vocab_ids.size(), config.mlm_probability, device=device)
+        # set to 0.0 where nodes are !IDENTIFIERS, i.e. node_types == 1
+        if config.mlm_statements_only:
+            probabilities.masked_fill_(node_types.bool(), 0.0)
+        # set to 0.0 where statements are !UNK
+        if config.mlm_exclude_unk_tokens:
+            probabilities.masked_fill_(vocab_ids == config.unk_token_id, 0.0)
+
+        # get the node mask that determines the nodes we use as targets
+        mlm_target_mask = torch.bernoulli(probabilities).bool()
+        # of those, get the 80% where the input is masked
+        masked_out_nodes = torch.bernoulli(torch.full(vocab_ids.size(), 0.8, device=device)).bool() & mlm_target_mask
+        
+        # the 10% where it's set to a random token
+        # (as 50% of the target nodes that are not masked out)
+        random_nodes = torch.bernoulli(torch.full(vocab_ids.size(), 0.5, device=device)).bool() & mlm_target_mask & ~masked_out_nodes
+        # and the 10% where it's the original id, we just leave alone.
+        
+        # apply the changes
+        random_ids = torch.randint(config.vocab_size, vocab_ids.shape, dtype=torch.long, device=device)
+        vocab_ids[masked_out_nodes] = config.mlm_mask_token_id
+        vocab_ids[random_nodes] = random_ids[random_nodes]
+        # the loss function can ignore -1 labels for gradients,
+        # although it's more efficient to gather according to the mlm_target_mask mask
+        labels[~mlm_target_mask] = -1
+        
+        return vocab_ids, labels, mlm_target_mask
+
+    def run_epoch(self, loader, epoch_type, analysis_mode=False):
         """
         args:
             loader: a pytorch-geometric dataset loader,
@@ -160,12 +239,15 @@ class Learner(object):
             loss, accuracy, instance_per_second
         """
 
-        bar = tqdm.tqdm(total=len(loader) * loader.batch_size, smoothing=0.01, unit='inst')
-
+        bar = tqdm.tqdm(total=len(loader.dataset), smoothing=0.01, unit='inst')
+        if analysis_mode:
+            saved_outputs = []
+        
         epoch_loss = 0
         accuracies = []
         start_time = time.time()
         processed_graphs = 0
+        mlm_predicted_tokens = 0
 
         for step, batch in enumerate(loader):
             ######### prepare input
@@ -173,6 +255,16 @@ class Learner(object):
             batch.to(self.model.dev)
 
             inputs = self.data2input(batch)
+            
+            if self.config.name == 'GGNN_POJ104_ForPretraining_Config':
+                mlm_vocab_ids, mlm_labels, mlm_target_mask = self.bertify_batch(batch, self.config)
+                inputs.update({
+                    'vocab_ids': mlm_vocab_ids,
+                    'labels': mlm_labels,
+                    'mlm_target_mask': mlm_target_mask,
+                })
+                mlm_predicted_tokens += torch.sum(mlm_target_mask.to(torch.long)).item()
+            
             num_graphs = inputs['num_graphs']
             processed_graphs += num_graphs
 
@@ -191,12 +283,19 @@ class Learner(object):
                     self.model.opt.zero_grad()
                 with torch.no_grad():  # don't trace computation graph!
                     outputs = self.model(**inputs)
-
+            
+            if analysis_mode:
+                # TODO I don't know whether the outputs are properly cloned, moved to cpu and detached or not.
+                saved_outputs.append(outputs)
+            
             (logits, accuracy, logits, correct, targets, graph_features, *unroll_stats,
             ) = outputs
-
-            loss = self.model.loss((logits, graph_features), targets)
-            epoch_loss += loss.item() * num_graphs
+            if self.config.name == 'GGNN_POJ104_ForPretraining_Config':
+                loss = self.model.loss(logits, targets, mlm_target_mask)
+                epoch_loss += loss.item()
+            else:
+                loss = self.model.loss((logits, graph_features), targets)
+                epoch_loss += loss.item() * num_graphs
             accuracies.append(np.array(accuracy.item()) * num_graphs)
 
             if epoch_type == "train":
@@ -208,14 +307,24 @@ class Learner(object):
                 self.model.opt.step()
                 self.model.opt.zero_grad()
 
-            bar.set_postfix(loss=epoch_loss / processed_graphs, acc=np.sum(accuracies, axis=0) / processed_graphs)
+            bar_loss = epoch_loss / (step+1) if self.config.name == 'GGNN_POJ104_ForPretraining_Config' else epoch_loss / processed_graphs
+            bar.set_postfix(loss=bar_loss, acc=np.sum(accuracies, axis=0) / processed_graphs, ppl=np.exp(bar_loss))
             bar.update(num_graphs)
 
         bar.close()
-        mean_loss = epoch_loss / processed_graphs
+        if self.config.name == 'GGNN_POJ104_ForPretraining_Config':
+            mean_loss = epoch_loss / (step + 1)
+        else:
+            mean_loss = epoch_loss / processed_graphs
         accuracy = np.sum(accuracies, axis=0) / processed_graphs
         instance_per_sec = processed_graphs / (time.time() - start_time)
-        return mean_loss, accuracy, instance_per_sec
+        epoch_perplexity = np.exp(mean_loss)
+        
+        returns = (mean_loss, accuracy, instance_per_sec, epoch_perplexity)
+
+        if analysis_mode:
+            returns += (saved_outputs,)
+        return returns
 
     def train(self):
         log_to_save = []
@@ -224,12 +333,12 @@ class Learner(object):
         # we enter training after restore
         if self.parent_run_id is not None:
             print(f"== Epoch pre-validate epoch {self.current_epoch}")
-            _, valid_acc, _, = self.run_epoch(self.valid_data, "val")
+            _, valid_acc, _, ppl = self.run_epoch(self.valid_data, "val")
             best_val_acc = np.sum(valid_acc)
             best_val_acc_epoch = self.current_epoch
             print(
-                "\r\x1b[KResumed operation, initial cum. val. acc: %.5f"
-                % best_val_acc
+                "\r\x1b[KResumed operation, initial cum. val. acc: %.5f, ppl %.5f"
+                % (best_val_acc, ppl)
             )
             self.current_epoch += 1
         else:
@@ -240,28 +349,28 @@ class Learner(object):
         for epoch in range(self.current_epoch, target_epoch):
             print(f"== Epoch {epoch}/{target_epoch}")
 
-            train_loss, train_acc, train_speed = self.run_epoch(
+            train_loss, train_acc, train_speed, train_ppl = self.run_epoch(
                 self.train_data, "train"
             )
             print(
-                "\r\x1b[K Train: loss: %.5f | acc: %s | instances/sec: %.2f"
-                % (train_loss, f"{train_acc:.5f}", train_speed)
+                "\r\x1b[K Train: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
+                % (train_loss, f"{train_acc:.5f}", train_ppl, train_speed)
             )
 
-            valid_loss, valid_acc, valid_speed = self.run_epoch(
+            valid_loss, valid_acc, valid_speed, valid_ppl = self.run_epoch(
                 self.valid_data, "eval"
             )
             print(
-                "\r\x1b[K Valid: loss: %.5f | acc: %s | instances/sec: %.2f"
-                % (valid_loss, f"{valid_acc:.5f}", valid_speed)
+                "\r\x1b[K Valid: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
+                % (valid_loss, f"{valid_acc:.5f}", valid_ppl, valid_speed)
             )
 
-            test_loss, test_acc, test_speed = self.run_epoch(
+            test_loss, test_acc, test_speed, test_ppl = self.run_epoch(
                 self.test_data, "eval"
             )
             print(
-                "\r\x1b[K Test: loss: %.5f | acc: %s | instances/sec: %.2f"
-                % (test_loss, f"{test_acc:.5f}", test_speed)
+                "\r\x1b[K Test: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
+                % (test_loss, f"{test_acc:.5f}", test_ppl, test_speed)
             )
 
             epoch_time = time.time() - total_time_start
@@ -270,9 +379,9 @@ class Learner(object):
             log_entry = {
                 "epoch": epoch,
                 "time": epoch_time,
-                "train_results": (train_loss, train_acc.tolist(), train_speed),
-                "valid_results": (valid_loss, valid_acc.tolist(), valid_speed),
-                "test_results": (test_loss, test_acc.tolist(), test_speed),
+                "train_results": (train_loss, train_acc.tolist(), train_speed, train_ppl),
+                "valid_results": (valid_loss, valid_acc.tolist(), valid_speed, valid_ppl),
+                "test_results": (test_loss, test_acc.tolist(), test_speed, test_ppl),
             }
             log_to_save.append(log_entry)
             with open(self.log_file, "w") as f:
@@ -303,28 +412,28 @@ class Learner(object):
 
         print(f"== Epoch: Test only run.")
 
-        valid_loss, valid_acc, valid_speed = self.run_epoch(
+        valid_loss, valid_acc, valid_speed, valid_ppl = self.run_epoch(
             self.valid_data, "eval"
         )
         print(
-            "\r\x1b[K Valid: loss: %.5f | acc: %s | instances/sec: %.2f"
-            % (valid_loss, f"{valid_acc:.5f}", valid_speed)
+            "\r\x1b[K Valid: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
+            % (valid_loss, f"{valid_acc:.5f}", valid_ppl, valid_speed)
         )
 
-        test_loss, test_acc, test_speed = self.run_epoch(
+        test_loss, test_acc, test_speed, test_ppl = self.run_epoch(
             self.test_data, "eval"
         )
         print(
-            "\r\x1b[K Test: loss: %.5f | acc: %s | instances/sec: %.2f"
-            % (test_loss, f"{test_acc:.5f}", test_speed)
+            "\r\x1b[K Test: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
+            % (test_loss, f"{test_acc:.5f}", test_ppl, test_speed)
         )
 
         epoch_time = time.time() - total_time_start
         log_entry = {
             "epoch": 'test_only',
             "time": epoch_time,
-            "valid_results": (valid_loss, valid_acc.tolist(), valid_speed),
-            "test_results": (test_loss, test_acc.tolist(), test_speed),
+            "valid_results": (valid_loss, valid_acc.tolist(), valid_speed, valid_ppl),
+            "test_results": (test_loss, test_acc.tolist(), test_speed, test_ppl),
         }
         log_to_save.append(log_entry)
         with open(self.log_file, "w") as f:
@@ -335,7 +444,8 @@ class Learner(object):
             'run_id': self.run_id,
             'global_training_step': self.global_training_step,
             'epoch': epoch,
-            'config': self.config,
+            'config': self.config.to_dict(),
+            'model_name': self.model.__class__.__name__,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.model.opt.state_dict(),
         }
@@ -358,15 +468,16 @@ class Learner(object):
 
         config_dict = checkpoint['config'] if isinstance(checkpoint['config'], dict) else checkpoint['config'].to_dict()
         if not self.args.get('--skip_restore_config'):
-            config = GGNNConfig.from_dict(config_dict)
+            config = getattr(configs, config_dict['name']).from_dict(config_dict)
             self.config = config
-            print(f'*RESTORED* self.config from checkpoint {str(path)}.')
+            print(f'*RESTORED* self.config = {config.name} from checkpoint {str(path)}.')
         else:
             print(f'Skipped restoring self.config from checkpoint!')
             self.config.check_equal(config_dict)
 
         test_only = self.args.get('--test', False)
-        model = GGNNModel(self.config, test_only=test_only)
+        Model = getattr(modeling, checkpoint['model_name'])
+        model = Model(self.config, test_only=test_only)
         model.load_state_dict(checkpoint['model_state_dict'])
         print(f'*RESTORED* model parameters from checkpoint {str(path)}.')
         if not self.args.get('--test', None):  # only restore opt if needed. opt should be None o/w.
@@ -379,7 +490,10 @@ if __name__ == '__main__':
     args = docopt(__doc__)
     print(args)
     assert not (args['--config'] and args['--config_json']), "Can't decide which config to use!"
-    learner = Learner(args=args)
+    assert args['--model'].lower() in MODEL_CLASSES or not args['--model'], f'Unknown model.'
+    assert args['--dataset'].lower() in DATASET_CLASSES or not args['--dataset'], f'Unknown dataset.' 
+
+    learner = Learner(model=args['--model'], dataset=args['--dataset'], args=args)
     if args.get('--test', None):
         learner.test()
     else:
