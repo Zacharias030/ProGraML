@@ -10,9 +10,27 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+            
         },
         {
-            "name": "Python: run supervised",
+            "name": "Python: run transformer supervised",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--log_dir",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "--model",
+                "transformer",
+                "--dataset",
+                "poj104",
+                "--config_json",
+                "{'train_subset': [0, 10], 'batch_size': 64}",
+            ]
+        },
+        {
+            "name": "Python: run ggnn supervised",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
@@ -29,7 +47,7 @@
             ]
         },
         {
-            "name": "Python: pretraining",
+            "name": "Python: ggnn pretraining",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",

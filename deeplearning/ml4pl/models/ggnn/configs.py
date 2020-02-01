@@ -29,6 +29,10 @@ class ProGraMLBaseConfig(object):
         self.train_subset = [0, 100]
         self.random_seed: int = 42
 
+        # Readout
+        self.output_dropout: float = 0.0
+        
+
         # Model Hyperparameters
         self.emb_size: int = 200
         self.edge_type_count: int = 3
@@ -72,7 +76,12 @@ class GGNN_POJ104_Config(ProGraMLBaseConfig):
         super().__init__()
         ###############
         # Model Hyperparameters
-        self.layer_timesteps: List[int] = [2, 2, 2, 2]
+        self.gnn_layers: int = 8
+        self.message_weight_sharing: int = 2
+        self.update_weight_sharing: int = 2
+        #self.message_timesteps: List[int] = [2, 2, 2, 2]
+        #self.update_timesteps: List[int] = [2, 2, 2, 2]
+        
         # currently only admits node types 0 and 1 for statements and identifiers.
         self.use_node_types: bool = False
         self.use_edge_bias: bool = True
@@ -84,7 +93,6 @@ class GGNN_POJ104_Config(ProGraMLBaseConfig):
 
         ###############
         # Regularization
-        self.output_dropout: float = 0.0  # dropout prob = 1-keep_prob
         self.edge_weight_dropout: float = 0.0
         self.graph_state_dropout: float = 0.2
 
@@ -103,25 +111,52 @@ class GGNN_POJ104_Config(ProGraMLBaseConfig):
 class GraphTransformerConfig(ProGraMLBaseConfig):
     def __init__(self):
         super().__init__()
+        # Overwriting from BaseConfig
+        #self.clip_grad_norm: float = 2.0
+        self.lr: float = 2.5e-4 #0.0 #1e-6 #1e-5 #0.00025
+        self.num_epochs = 300
+        
+        ###### borrowed for debugging ##########
+        
+        # GGNNMessage Layer
+        #self.msg_mean_aggregation: bool = True
+        #self.use_edge_bias: bool = True
+        
+        ###############
         self.backward_edges: bool = True
-        self.layer_timesteps: List[int] = [2, 2, 2, 2]
+        self.gnn_layers: int = 8
+        self.message_weight_sharing: int = 2
+        self.update_weight_sharing: int = 2
+        #self.layer_timesteps: List[int] = [1, 1, 1, 1, 1, 1, 1, 1] #[2, 2, 2, 2]
         self.use_node_types: bool = False
-        self.position_embeddings: bool = False
 
         # Dataset inherent, don't change!
         self.num_classes: int = 104
         self.has_graph_labels: bool = True
+        self.emb_size = 200
         self.hidden_size: int = self.emb_size + getattr(self, 'selector_size', 0)
 
-        # Self-Attn Layer
+        # Message:
+        self.position_embeddings: bool = True
+        #  Self-Attn Layer
         self.attn_bias = True
-        self.attn_num_heads = 8 # choose among 4,5,8,10 for emb_sz 200
+        self.attn_num_heads = 5 #8 # choose among 4,5,8,10 for emb_sz 200
         self.attn_dropout = 0.1
+        self.attn_v_pos = False
 
+        # Update: 
+        
         # Transformer Update Layer
-        self.tfmr_act = 'relu' # relu or gelu, default relu
-        self.tfmr_dropout = 0.1 # default 0.1
-        self.tfmr_ff_sz = 512 # ~ 2.5 model_dim (Bert: 768 - 2048, Trfm: base 512 - 2048, big 1024 - 4096)
+        self.update_layer: str = 'ff' # or 'gru'
+        self.tfmr_act = 'gelu' # relu or gelu, default relu
+        self.tfmr_dropout = 0.2 # default 0.1
+        self.tfmr_ff_sz = 512 #512 # ~ 2.5 model_dim (Bert: 768 - 2048, Trfm: base 512 - 2048, big 1024 - 4096)
+        
+        # Optionally: GGNN Update Layer
+        #self.update_layer: str = 'gru' # or 'ff'
+        #self.edge_weight_dropout: float = 0.0
+        #self.graph_state_dropout: float = 0.2
+        
 
 
 class GGNN_POJ104_ForPretraining_Config(GGNN_POJ104_Config):

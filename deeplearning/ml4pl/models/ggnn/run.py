@@ -63,7 +63,7 @@ from deeplearning.ml4pl.models.ggnn import configs
 
 
 
-# Slurm gives us among others: SLURM_JOBID, SLURM_JOB_NAME, 
+# Slurm gives us among others: SLURM_JOBID, SLURM_JOB_NAME,
 # SLURM_JOB_DEPENDENCY (set to the value of the --dependency option)
 if os.environ.get('SLURM_JOBID'):
     print('SLURM_JOB_NAME', os.environ.get('SLURM_JOB_NAME', ''))
@@ -85,13 +85,16 @@ DATASET_CLASSES = {
     'poj104': POJ104Dataset,
 }
 
+DEBUG = False
+if DEBUG:
+    torch.autograd.set_detect_anomaly(True)
 
 class Learner(object):
     def __init__(self, model, dataset, args=None):
         # get model and dataset
         Model, Config = MODEL_CLASSES[model]
         Dataset = DATASET_CLASSES[dataset]
-        
+
         # Make class work without file being run as main
         self.args = docopt(__doc__, argv=[])
         if args:
@@ -101,7 +104,7 @@ class Learner(object):
         self.parent_run_id = None  # for restored models
         self.run_id = f"{time.strftime('%Y-%m-%d_%H:%M:%S')}_{RUN_ID}"
         log_dir = REPO_ROOT / self.args.get("--log_dir", '.')
-        log_dir.mkdir(parents=True, exist_ok=True)    
+        log_dir.mkdir(parents=True, exist_ok=True)
         self.log_file = log_dir / f"{self.run_id}_log.json"
         self.best_model_file = log_dir / f"{self.run_id}_model_best.pickle"
         self.last_model_file = log_dir / f"{self.run_id}_model_last.pickle"
@@ -138,7 +141,7 @@ class Learner(object):
         config_dict = self.config.to_dict()
         with open(log_dir / f"{self.run_id}_params.json", "w") as f:
             json.dump(config_dict, f)
-        
+
         # log parent run to file if run was restored
         if self.parent_run_id:
             with open(log_dir / f"{self.run_id}_parent.json", "w") as f:
@@ -200,7 +203,7 @@ class Learner(object):
         labels = vocab_ids.clone()
         node_types = batch.x[:, 1]
         device = vocab_ids.device
-        
+
         # we create a tensor that carries the probability of being masked for each node
         probabilities = torch.full(vocab_ids.size(), config.mlm_probability, device=device)
         # set to 0.0 where nodes are !IDENTIFIERS, i.e. node_types == 1
@@ -214,12 +217,12 @@ class Learner(object):
         mlm_target_mask = torch.bernoulli(probabilities).bool()
         # of those, get the 80% where the input is masked
         masked_out_nodes = torch.bernoulli(torch.full(vocab_ids.size(), 0.8, device=device)).bool() & mlm_target_mask
-        
+
         # the 10% where it's set to a random token
         # (as 50% of the target nodes that are not masked out)
         random_nodes = torch.bernoulli(torch.full(vocab_ids.size(), 0.5, device=device)).bool() & mlm_target_mask & ~masked_out_nodes
         # and the 10% where it's the original id, we just leave alone.
-        
+
         # apply the changes
         random_ids = torch.randint(config.vocab_size, vocab_ids.shape, dtype=torch.long, device=device)
         vocab_ids[masked_out_nodes] = config.mlm_mask_token_id
@@ -227,7 +230,7 @@ class Learner(object):
         # the loss function can ignore -1 labels for gradients,
         # although it's more efficient to gather according to the mlm_target_mask mask
         labels[~mlm_target_mask] = -1
-        
+
         return vocab_ids, labels, mlm_target_mask
 
     def run_epoch(self, loader, epoch_type, analysis_mode=False):
@@ -242,12 +245,11 @@ class Learner(object):
         bar = tqdm.tqdm(total=len(loader.dataset), smoothing=0.01, unit='inst')
         if analysis_mode:
             saved_outputs = []
-        
-        epoch_loss = 0
-        accuracies = []
+
+        epoch_loss, epoch_accuracy = 0, 0
         start_time = time.time()
         processed_graphs = 0
-        mlm_predicted_tokens = 0
+        predicted_targets = 0
 
         for step, batch in enumerate(loader):
             ######### prepare input
@@ -255,23 +257,29 @@ class Learner(object):
             batch.to(self.model.dev)
 
             inputs = self.data2input(batch)
-            
-            if self.config.name == 'GGNN_POJ104_ForPretraining_Config':
+            num_graphs = inputs['num_graphs']
+
+            if self.config.name == 'GGNN_POJ104_ForPretraining_Config': # only implemented nodewise model
                 mlm_vocab_ids, mlm_labels, mlm_target_mask = self.bertify_batch(batch, self.config)
                 inputs.update({
                     'vocab_ids': mlm_vocab_ids,
                     'labels': mlm_labels,
-                    'mlm_target_mask': mlm_target_mask,
+                    'readout_mask': mlm_target_mask,
                 })
-                mlm_predicted_tokens += torch.sum(mlm_target_mask.to(torch.long)).item()
-            
-            num_graphs = inputs['num_graphs']
+                num_targets = torch.sum(mlm_target_mask.to(torch.long)).item()
+            elif getattr(self.config, 'has_graph_labels', False): # all graph models
+                num_targets = num_graphs
+            # TODO: elif: other nodewise configs go here!
+            else:
+                raise NotImplementedError("We don't have other nodewise models currently.")
+
+            predicted_targets += num_targets
             processed_graphs += num_graphs
 
             #############
             # RUN MODEL FORWARD PASS
 
-            # enter correct mode of model
+            # enter correct mode of model and fetch output
             if epoch_type == "train":
                 self.global_training_step += 1
                 if not self.model.training:
@@ -283,21 +291,20 @@ class Learner(object):
                     self.model.opt.zero_grad()
                 with torch.no_grad():  # don't trace computation graph!
                     outputs = self.model(**inputs)
-            
+
             if analysis_mode:
                 # TODO I don't know whether the outputs are properly cloned, moved to cpu and detached or not.
                 saved_outputs.append(outputs)
-            
-            (logits, accuracy, logits, correct, targets, graph_features, *unroll_stats,
-            ) = outputs
-            if self.config.name == 'GGNN_POJ104_ForPretraining_Config':
-                loss = self.model.loss(logits, targets, mlm_target_mask)
-                epoch_loss += loss.item()
-            else:
-                loss = self.model.loss((logits, graph_features), targets)
-                epoch_loss += loss.item() * num_graphs
-            accuracies.append(np.array(accuracy.item()) * num_graphs)
 
+            (logits, accuracy, correct, targets, graph_features, *unroll_stats,
+            ) = outputs
+
+            loss = self.model.loss((logits, graph_features), targets)
+
+            epoch_loss += loss.item() * num_targets
+            epoch_accuracy += accuracy.item() * num_targets
+
+            # update weights
             if epoch_type == "train":
                 loss.backward()
                 if self.model.config.clip_grad_norm > 0.0:
@@ -307,20 +314,21 @@ class Learner(object):
                 self.model.opt.step()
                 self.model.opt.zero_grad()
 
-            bar_loss = epoch_loss / (step+1) if self.config.name == 'GGNN_POJ104_ForPretraining_Config' else epoch_loss / processed_graphs
-            bar.set_postfix(loss=bar_loss, acc=np.sum(accuracies, axis=0) / processed_graphs, ppl=np.exp(bar_loss))
+            # update bar display
+            bar_loss = epoch_loss / predicted_targets
+            bar_acc = epoch_accuracy / predicted_targets
+            bar.set_postfix(loss=bar_loss, acc=bar_acc, ppl=np.exp(bar_loss))
             bar.update(num_graphs)
 
         bar.close()
-        if self.config.name == 'GGNN_POJ104_ForPretraining_Config':
-            mean_loss = epoch_loss / (step + 1)
-        else:
-            mean_loss = epoch_loss / processed_graphs
-        accuracy = np.sum(accuracies, axis=0) / processed_graphs
+
+        # Return epoch stats
+        mean_loss = epoch_loss / predicted_targets
+        mean_accuracy = epoch_accuracy / predicted_targets
         instance_per_sec = processed_graphs / (time.time() - start_time)
         epoch_perplexity = np.exp(mean_loss)
-        
-        returns = (mean_loss, accuracy, instance_per_sec, epoch_perplexity)
+
+        returns = (mean_loss, mean_accuracy, instance_per_sec, epoch_perplexity)
 
         if analysis_mode:
             returns += (saved_outputs,)
@@ -379,9 +387,9 @@ class Learner(object):
             log_entry = {
                 "epoch": epoch,
                 "time": epoch_time,
-                "train_results": (train_loss, train_acc.tolist(), train_speed, train_ppl),
-                "valid_results": (valid_loss, valid_acc.tolist(), valid_speed, valid_ppl),
-                "test_results": (test_loss, test_acc.tolist(), test_speed, test_ppl),
+                "train_results": (train_loss, train_acc, train_speed, train_ppl),
+                "valid_results": (valid_loss, valid_acc, valid_speed, valid_ppl),
+                "test_results": (test_loss, test_acc, test_speed, test_ppl),
             }
             log_to_save.append(log_entry)
             with open(self.log_file, "w") as f:
@@ -432,8 +440,8 @@ class Learner(object):
         log_entry = {
             "epoch": 'test_only',
             "time": epoch_time,
-            "valid_results": (valid_loss, valid_acc.tolist(), valid_speed, valid_ppl),
-            "test_results": (test_loss, test_acc.tolist(), test_speed, test_ppl),
+            "valid_results": (valid_loss, valid_acc, valid_speed, valid_ppl),
+            "test_results": (test_loss, test_acc, test_speed, test_ppl),
         }
         log_to_save.append(log_entry)
         with open(self.log_file, "w") as f:
@@ -491,7 +499,7 @@ if __name__ == '__main__':
     print(args)
     assert not (args['--config'] and args['--config_json']), "Can't decide which config to use!"
     assert args['--model'].lower() in MODEL_CLASSES or not args['--model'], f'Unknown model.'
-    assert args['--dataset'].lower() in DATASET_CLASSES or not args['--dataset'], f'Unknown dataset.' 
+    assert args['--dataset'].lower() in DATASET_CLASSES or not args['--dataset'], f'Unknown dataset.'
 
     learner = Learner(model=args['--model'], dataset=args['--dataset'], args=args)
     if args.get('--test', None):
