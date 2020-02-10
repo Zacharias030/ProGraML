@@ -214,7 +214,7 @@ def DotCallGraphAndControlFlowGraphsFromBytecode(
   """
   control_flow_graph_dots, callgraph_dots = DotGraphsFromBytecode(
     bytecode,
-    ["-dot-cfg", "-dot-callgraph"],
+    ["-metarenamer", "-dot-cfg", "-dot-callgraph"],
     opt_path,
     lambda name: name != "callgraph.dot",
   )

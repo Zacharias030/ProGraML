@@ -12,8 +12,78 @@
             "console": "integratedTerminal"
             
         },
+        // configs below this line!
+        //"justMyCode": false,
         {
-            "name": "Python: run transformer supervised",
+            "name": "Python: run threadcoarsening supervised",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            //"justMyCode": false,
+            "args": [
+                "--log_dir",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "--model",
+                "transformer_threadcoarsening",
+                "--dataset",
+                "threadcoarsening_Cypress",
+                "--config_json",
+                "{'train_subset': [0, 100], 'num_epochs': 600}",
+                "--kfold",
+            ]
+        },
+        {
+            "name": "Python: ggnn transfer devmap",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset", "devmap_amd",
+                "--kfold",
+                //"--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
+                "--log_dir", "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/transfer_ggnn/",
+                "--config_json",
+                "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'num_epochs': 200, 'lr': 2.5e-4, 'vocab_size': 8569}",
+                "--transfer", "ggnn_devmap",
+                "--restore", "deeplearning/ml4pl/poj104/classifyapp_logs/pretraining/2020-02-09_22:43:31_26645_model_best.pickle",
+            ]
+        },
+        {
+            "name": "Python: trfm transfer devmap",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset", "devmap_amd",
+                "--kfold",
+                //"--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
+                "--log_dir", "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/transfer/",
+                "--config_json",
+                "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'num_epochs': 200, 'lr': 2.5e-4, 'vocab_size': 8569}",
+                "--transfer", "transformer_devmap",
+                "--restore", "deeplearning/ml4pl/poj104/classifyapp_logs/pretraining/2020-02-09_12:06:42_4979_model_best.pickle",
+            ]
+        },
+        {
+            "name": "Python: trfm ncc pretraining",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--model", "transformer_pretraining",
+                "--dataset", "ncc",
+                "--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
+                "--log_dir", "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "--config_json",
+                "{'train_subset': [0, 100], 'batch_size': 24, 'max_num_nodes': 30000, 'num_epochs': 160}",
+            ]
+        },
+        {
+            "name": "Python: run devmap supervised",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
@@ -22,11 +92,29 @@
                 "--log_dir",
                 "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
                 "--model",
-                "transformer",
+                "ggnn_devmap",
+                "--dataset",
+                "devmap_amd",
+                "--config_json",
+                "{'train_subset': [0, 100]}",
+                "--kfold",
+            ]
+        },
+        {
+            "name": "Python: run transformer poj104",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--log_dir",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "--model",
+                "transformer_poj104",
                 "--dataset",
                 "poj104",
                 "--config_json",
-                "{'train_subset': [0, 10], 'batch_size': 64}",
+                "{'train_subset': [0, 10], 'batch_size': 64, 'num_epochs': 3}",
             ]
         },
         {
@@ -47,7 +135,22 @@
             ]
         },
         {
-            "name": "Python: ggnn pretraining",
+            "name": "Python: ggnn ncc pretraining",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--model", "ggnn_pretraining",
+                "--dataset", "ncc",
+                "--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
+                "--log_dir", "deeplearning/ml4pl/poj104/classifyapp_logs/pretraining/",
+                "--config_json",
+                "{'train_subset': [0, 100], 'batch_size': 32, 'max_num_nodes': 60000, 'num_epochs': 160}",
+            ]
+        },
+        {
+            "name": "Python: ggnn poj104 pretraining",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
@@ -118,13 +221,6 @@
                 "--restore",
                 "deeplearning/ml4pl/poj104/classifyapp_logs/2020-01-14-01-15-04_24281_model_best.pickle",
             ]
-        },
-        {
-            "name": "Python: Current File",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
         },
         {
             "name": "ggnn.py",

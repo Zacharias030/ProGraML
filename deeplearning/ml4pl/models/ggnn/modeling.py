@@ -51,7 +51,8 @@ class BaseGNNModel(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def setup(self, test_only):
+    def setup(self, config, test_only):
+        self.loss = Loss(config)
         # move model to device before making optimizer!
         self.dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -69,7 +70,7 @@ class BaseGNNModel(nn.Module):
 
     def forward(self, vocab_ids, labels, edge_lists,
                 pos_lists=None, num_graphs=None, graph_nodes_list=None,
-                node_types=None, aux_in=None, test_time_steps=None, readout_mask=None,
+                node_types=None, aux_in=None, test_time_steps=None, readout_mask=None, runtimes=None,
         ):
         # Input
         raw_in = self.node_embeddings(vocab_ids)
@@ -88,6 +89,7 @@ class BaseGNNModel(nn.Module):
                 raw_out,
                 graph_nodes_list=graph_nodes_list,
                 num_graphs=num_graphs,
+                auxiliary_features=aux_in,
                 readout_mask=readout_mask,
             )
             logits = graphwise_readout
@@ -96,12 +98,19 @@ class BaseGNNModel(nn.Module):
             graphwise_readout = None
             logits = nodewise_readout
 
+        #if getattr(self.config, 'has_aux_input', False):
+        #    assert self.config.has_graph_labels is True, \
+        #        "Implementation hasn't been checked for use with aux_input and nodewise prediction! It could work or fail silently."
+        #    assert aux_in is not None
+        #    logits, graphwise_readout = self.aux_readout(logits, aux_in)
+
+
         if readout_mask is not None:  # need to mask labels in the same fashion.
             labels = labels[readout_mask]
 
-        # Metrics            
-        # accuracy, pred_targets, correct, targets
-        metrics_tuple = self.metrics(logits, labels)
+        # Metrics
+        # accuracy, correct?, targets, maybe runtimes: actual, optimal
+        metrics_tuple = self.metrics(logits, labels, runtimes)
 
         outputs = (
             (logits,) + metrics_tuple + (graphwise_readout,) + tuple(unroll_stats)
@@ -113,7 +122,7 @@ class BaseGNNModel(nn.Module):
         """Compute the number of trainable parameters in this nn.Module and its children."""
         num_params = sum(param.numel() for param in self.parameters(recurse=True) if param.requires_grad)
         return f"{num_params:,} params, weights size: ~{num_params * 4 // 1e6:,}MB."
-        
+
 
 class GraphTransformerModel(BaseGNNModel):
     """Transformer Encoder for Graphs."""
@@ -124,10 +133,18 @@ class GraphTransformerModel(BaseGNNModel):
         self.gnn = GraphTransformerEncoder(config)
         self.readout = Readout(config)
 
-        self.loss = Loss(config)
+        # maybe tack on the aux readout
+        self.has_aux_input = getattr(self.config, "has_aux_input", False)
+        if self.has_aux_input:
+            #self.aux_readout = AuxiliaryReadout(config)
+            self.readout = BetterAuxiliaryReadout(config)
+        else:
+            self.readout = Readout(config)
+            
+
         self.metrics = Metrics()
 
-        self.setup(test_only)
+        self.setup(config, test_only)
         print(self)
         print(f"Number of trainable params in GraphTransformerModel: {self.num_parameters()}")
 
@@ -137,14 +154,13 @@ class GGNNForPretrainingModel(BaseGNNModel):
     def __init__(self, config, pretrained_embeddings=None, test_only=False):
         super().__init__()
         self.config = config
-        self.node_embeddings = NodeEmbeddingsForPretraining(config)
+        self.node_embeddings = NodeEmbeddings(config) #NodeEmbeddingsForPretraining(config)
         self.gnn = GGNNEncoder(config)
         self.readout = Readout(config)
 
-        self.loss = Loss(config)
         self.metrics = Metrics()
 
-        self.setup(test_only)
+        self.setup(config, test_only)
         print(self)
         print(f"Number of trainable params in GGNNForPretrainingModel: {self.num_parameters()}")
 
@@ -172,13 +188,13 @@ class GGNNModel(BaseGNNModel):
         # maybe tack on the aux readout
         self.has_aux_input = getattr(self.config, "has_aux_input", False)
         if self.has_aux_input:
+            assert False, "implement better auxiliary readout."
             self.aux_readout = AuxiliaryReadout(config)
 
         # eval and training
-        self.loss = Loss(config)
         self.metrics = Metrics()
 
-        self.setup(test_only)
+        self.setup(config, test_only)
         print(self)
         print(f"Number of trainable params in GGNNModel: {self.num_parameters()}")
 
@@ -195,6 +211,7 @@ class GGNNModel(BaseGNNModel):
         node_types=None,
         aux_in=None,
         test_time_steps=None,
+        runtimes=None,
     ):
         raw_in = self.node_embeddings(vocab_ids, selector_ids)
         raw_out, raw_in, *unroll_stats = self.gnn(
@@ -218,7 +235,7 @@ class GGNNModel(BaseGNNModel):
             logits, graphwise_readout = self.aux_readout(logits, aux_in)
 
         # accuracy, pred_targets, correct, targets
-        metrics_tuple = self.metrics(logits, labels)
+        metrics_tuple = self.metrics(logits, labels, runtimes)
 
         outputs = (
             (logits,) + metrics_tuple + (graphwise_readout,) + tuple(unroll_stats)
@@ -239,7 +256,7 @@ class GGNNEncoder(nn.Module):
     def __init__(self, config, readout=None):
         super().__init__()
         self.backward_edges = config.backward_edges
-        
+
         self.gnn_layers = config.gnn_layers
         self.message_weight_sharing = config.message_weight_sharing
         self.update_weight_sharing = config.update_weight_sharing
@@ -248,7 +265,7 @@ class GGNNEncoder(nn.Module):
         assert message_layers * self.message_weight_sharing == self.gnn_layers, "layer number and reuse mismatch."
         assert update_layers * self.update_weight_sharing == self.gnn_layers, "layer number and reuse mismatch."
         #self.layer_timesteps = config.layer_timesteps
-        
+
         self.position_embeddings = config.position_embeddings
 
         # optional eval time unrolling parameter
@@ -290,7 +307,7 @@ class GGNNEncoder(nn.Module):
         # Currently only at eval time, but there is really no good reason for this.
         assert self.unroll_strategy == 'none', 'New layer_timesteps not implemented for this unroll_strategy.'
         #if self.training or self.unroll_strategy == "none":
-        #    #layer_timesteps = 
+        #    #layer_timesteps =
         #    #layer_timesteps = self.layer_timesteps
         #elif self.unroll_strategy == "constant":
         #    layer_timesteps = self.test_layer_timesteps
@@ -403,7 +420,7 @@ class GraphTransformerEncoder(nn.Module):
             )
         else:
             self.position_embs = None
-            
+
         # Message and update layers
         self.message = nn.ModuleList()
         #for i in range(len(self.layer_timesteps)):
@@ -416,8 +433,8 @@ class GraphTransformerEncoder(nn.Module):
         elif update_layer == 'gru':
             UpdateLayer = GGNNUpdateLayer
         else:
-            raise ValueError("config.update_layer has to be 'gru' or 'ff'!") 
-        
+            raise ValueError("config.update_layer has to be 'gru' or 'ff'!")
+
         self.update = nn.ModuleList()
         #for i in range(len(self.layer_timesteps)):
         for i in range(update_layers):
@@ -818,7 +835,7 @@ class GGNNMessageLayer(nn.Module):
             )
 
         for i, edge_list in enumerate(edge_lists):
-            edge_targets = edge_list[:, 1]  
+            edge_targets = edge_list[:, 1]
             edge_sources = edge_list[:, 0]
 
             #messages_by_source = F.embedding(
@@ -828,7 +845,7 @@ class GGNNMessageLayer(nn.Module):
 
             if self.pos_transform:
                 pos_list = pos_lists[i]
-                #pos_by_source = F.embedding(pos_list, pos_gating)  
+                #pos_by_source = F.embedding(pos_list, pos_gating)
                 pos_by_source = torch.index_select(pos_gating, dim=0, index=pos_list)
                 #messages_by_source.mul_(pos_by_source)
                 messages_by_source = messages_by_source * pos_by_source
@@ -1010,7 +1027,8 @@ class Readout(nn.Module):
             config.hidden_size, self.num_classes, dropout=config.output_dropout,
         )
 
-    def forward(self, raw_node_in, raw_node_out, graph_nodes_list=None, num_graphs=None, readout_mask=None):
+    def forward(self, raw_node_in, raw_node_out, graph_nodes_list=None,
+                num_graphs=None, auxiliary_features=None, readout_mask=None):
         if readout_mask is not None:
             # mask first to only process the stuff that goes into the loss function!
             raw_node_in = raw_node_in[readout_mask]
@@ -1090,60 +1108,125 @@ class LinearNet(nn.Module):
 # Mixing in graph-level features to readout
 
 class AuxiliaryReadout(nn.Module):
-  """Produces per-graph predictions by combining
-    the per-graph predictions with auxiliary features"""
+    """Produces per-graph predictions by combining
+    the per-graph predictions with auxiliary features.
+    Note that this AuxiliaryReadout after Readout is probably a bad idea
+    and BetterAuxiliaryReadout should be used instead."""
 
-  # TODO(github.com/ChrisCummins/ProGraML/issues/27): I don't like that we only
-  # introduce the global features AFTER the per node predictions have been made
-  # and not while we do those! This is limiting the expressivity of the model.
-  def __init__(self, config):
-    super().__init__()
-    self.num_classes = config.num_classes
-    self.log1p_graph_x = getattr(config, "log1p_graph_x", False)
-    assert (
-      config.has_graph_labels
-    ), "We expect aux readout in combination with graph labels, not node labels"
-    self.feed_forward = None
+    def __init__(self, config):
+        super().__init__()
+        self.num_classes = config.num_classes
+        self.aux_in_log1p = getattr(config, "aux_in_log1p", False)
+        assert (
+        config.has_graph_labels
+        ), "We expect aux readout in combination with graph labels, not node labels"
+        self.feed_forward = None
 
-    self.batch_norm = nn.BatchNorm1d(config.num_classes + config.aux_in_len)
-    self.feed_forward = nn.Sequential(
-      nn.Linear(
-        config.num_classes + config.aux_in_len, config.aux_in_layer_size,
-      ),
-      nn.ReLU(),
-      nn.Dropout(1 - config.output_dropout),
-      nn.Linear(config.aux_in_layer_size, config.num_classes),
-    )
+        self.batch_norm = nn.BatchNorm1d(config.num_classes + config.aux_in_size)
+        self.feed_forward = nn.Sequential(
+            nn.Linear(
+                config.num_classes + config.aux_in_size, config.aux_in_layer_size,
+            ),
+            nn.ReLU(),
+            nn.Dropout(config.output_dropout),
+            nn.Linear(config.aux_in_layer_size, config.num_classes),
+        )
 
-  def forward(self, graph_features, auxiliary_features):
-    assert (
-      graph_features.size()[0] == auxiliary_features.size()[0]
-    ), "every graph needs aux_features. Dimension mismatch."
-    if self.log1p_graph_x:
-      auxiliary_features.log1p_()
+    def forward(self, graph_features, auxiliary_features):
+        assert (
+        graph_features.size()[0] == auxiliary_features.size()[0]
+        ), "every graph needs aux_features. Dimension mismatch."
+        if self.aux_in_log1p:
+            auxiliary_features.log1p_()
 
-    aggregate_features = torch.cat((graph_features, auxiliary_features), dim=1)
+        aggregate_features = torch.cat((graph_features, auxiliary_features), dim=1)
 
-    normed_features = self.batch_norm(aggregate_features)
-    out = self.feed_forward(normed_features)
-    return out, graph_features
+        normed_features = self.batch_norm(aggregate_features)
+        out = self.feed_forward(normed_features)
+        return out, graph_features
+
+
+
+class BetterAuxiliaryReadout(nn.Module):
+    """Produces per-graph predictions by combining
+    the raw GNN Encoder output with auxiliary features.
+    The difference to AuxReadout(Readout()) is that the aux info
+    is concat'ed before the nodewise readout and not after the
+    reduction to graphwise predictions.
+    """
+
+    def __init__(self, config):
+        super().__init__()
+
+        self.aux_in_log1p = getattr(config, "aux_in_log1p", False)
+        assert config.has_graph_labels, \
+            "We expect aux readout in combination with graph labels, not node labels"
+
+        self.has_graph_labels = config.has_graph_labels
+        self.num_classes = config.num_classes
+
+        # now with aux_in concat'ed and batchnorm
+        self.regression_gate = nn.Sequential(
+            nn.BatchNorm1d(2 * config.hidden_size + config.aux_in_size),
+            LinearNet(2 * config.hidden_size + config.aux_in_size,
+                      self.num_classes, dropout=config.output_dropout,
+            )
+        )
+        # now with aux_in concat'ed and with intermediate layer
+        self.regression_transform = nn.Sequential(
+            nn.BatchNorm1d(config.hidden_size + config.aux_in_size),
+            LinearNet(config.hidden_size + config.aux_in_size,
+                      config.aux_in_layer_size, dropout=config.output_dropout,
+            ),
+            nn.ReLU(),
+            LinearNet(config.aux_in_layer_size, config.num_classes),
+        )
+
+    def forward(self, raw_node_in, raw_node_out, graph_nodes_list, num_graphs, auxiliary_features, readout_mask=None):
+        assert graph_nodes_list is not None and auxiliary_features is not None, 'need those'
+        if readout_mask is not None:
+            # mask first to only process the stuff that goes into the loss function!
+            raw_node_in = raw_node_in[readout_mask]
+            raw_node_out = raw_node_out[readout_mask]
+            if graph_nodes_list is not None:
+                graph_nodes_list = graph_nodes_list[readout_mask]
+
+        if self.aux_in_log1p:
+            auxiliary_features.log1p_()
+        aux_by_node = torch.index_select(auxiliary_features, dim=0, index=graph_nodes_list)
+
+        gate_input = torch.cat((raw_node_in, raw_node_out, aux_by_node), dim=-1)
+        gating = torch.sigmoid(self.regression_gate(gate_input))
+        trafo_input = torch.cat((raw_node_out, aux_by_node), dim=-1)
+        nodewise_readout = gating * self.regression_transform(trafo_input)
+
+        graph_readout = None
+        if self.has_graph_labels:
+            assert graph_nodes_list is not None and num_graphs is not None, 'has_graph_labels requires graph_nodes_list and num_graphs tensors.'
+            # aggregate via sums over graphs
+            device = raw_node_out.device
+            graph_readout = torch.zeros(num_graphs, self.num_classes, device=device)
+            graph_readout.index_add_(
+                dim=0, index=graph_nodes_list, source=nodewise_readout
+            )
+        return nodewise_readout, graph_readout
 
 
 ############################
 # GNN Input: Embedding Layers
 ############################
-class NodeEmbeddingsForPretraining(nn.Module):
-    """NodeEmbeddings with added embedding for [MASK] token."""
-
-    def __init__(self, config):
-        super().__init__()
-
-        print("Initializing with random embeddings for pretraining.")
-        self.node_embs = nn.Embedding(config.vocab_size + 1, config.emb_size)
-
-    def forward(self, vocab_ids):
-        embs = self.node_embs(vocab_ids)
-        return embs
+#class NodeEmbeddingsForPretraining(nn.Module):
+#    """NodeEmbeddings with added embedding for [MASK] token."""
+#
+#    def __init__(self, config):
+#        super().__init__()
+#
+#        print("Initializing with random embeddings for pretraining.")
+#        self.node_embs = nn.Embedding(config.vocab_size + 1, config.emb_size)
+#
+#    def forward(self, vocab_ids):
+#        embs = self.node_embs(vocab_ids)
+#        return embs
 
 
 class NodeEmbeddings(nn.Module):
@@ -1173,6 +1256,7 @@ class NodeEmbeddings(nn.Module):
         if config.inst2vec_embeddings == "constant":
             print("Using pre-trained inst2vec embeddings frozen.")
             assert pretrained_embeddings is not None
+            assert pretrained_embeddings.size()[0] == 8568, "Wrong number of embs; don't come here with MLM models!"
             self.node_embs = nn.Embedding.from_pretrained(
                 pretrained_embeddings, freeze=True
             )
@@ -1185,6 +1269,7 @@ class NodeEmbeddings(nn.Module):
         elif config.inst2vec_embeddings == "finetune":
             print("Fine-tuning inst2vec embeddings")
             assert pretrained_embeddings is not None
+            assert pretrained_embeddings.size()[0] == 8568, "Wrong number of embs; don't come here with MLM models!"
             self.node_embs = nn.Embedding.from_pretrained(
                 pretrained_embeddings, freeze=False
             )
@@ -1292,7 +1377,7 @@ class Metrics(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, logits, labels):
+    def forward(self, logits, labels, runtimes=None):
         # be flexible with 1hot labels vs indices
         if len(labels.size()) == 2:
             targets = labels.argmax(dim=1)
@@ -1305,7 +1390,21 @@ class Metrics(nn.Module):
         pred_targets = logits.argmax(dim=1)
         correct_preds = targets.eq(pred_targets).float()
         accuracy = torch.mean(correct_preds)
-        return accuracy, correct_preds, targets
+
+        ret = accuracy, correct_preds, targets
+
+        if runtimes is not None:
+            assert runtimes.size() == logits.size(), \
+                f"We need to have a runtime for each sample and every possible label!" \
+                f"runtimes={runtimes.size()}, logits={logits.size()}."
+            #actual = runtimes[pred#torch.index_select(runtimes, dim=1, index=pred_targets)
+            actual = torch.gather(runtimes, dim=1, index=pred_targets.view(-1, 1)).squeeze()
+            #actual = runtimes[:, pred_targets]
+            optimal = torch.gather(runtimes, dim=1, index=targets.view(-1, 1)).squeeze()
+            #optimal = runtimes[:, targets]
+            ret += (actual, optimal)
+
+        return ret
 
 
 # Huggingface implementation

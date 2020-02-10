@@ -4,12 +4,13 @@ Usage:
 
 Options:
     -h --help                       Show this screen.
-    --data_dir=DATA_DIR             Directory(*) to of dataset. (*)=relative to repository root ProGraML/.
-                                        [default: deeplearning/ml4pl/poj104/classifyapp_data]
+    --data_dir DATA_DIR             Directory(*) to of dataset. (*)=relative to repository root ProGraML/.
+                                        Will overwrite the per-dataset defaults if provided.
+
     --log_dir LOG_DIR               Directory(*) to store logfiles and trained models relative to repository dir.
                                         [default: deeplearning/ml4pl/poj104/classifyapp_logs/]
-    --model MODEL                   The model to run [default: ggnn]
-    --dataset DATASET               The dataset to use [default: poj104]
+    --model MODEL                   The model to run.
+    --dataset DATASET               The dataset to us.
     --config CONFIG                 Path(*) to a config json dump with params.
     --config_json CONFIG_JSON       Config json with params.
     --restore CHECKPOINT            Path(*) to a model file to restore from.
@@ -18,8 +19,19 @@ Options:
     --restore_by_pattern PATTERN    Restore newest model of this name from log_dir and
                                         continue training. (AULT specific!)
                                         PATTERN is a string that can be grep'ed for.
+    --kfold                         Run kfold cross-validation iff kfold is set.
+                                        Splits are currently dataset specific.
+    --transfer MODEL                The model-class to transfer to.
+                                    The args specified will be applied to the transferred model to the extend applicable, e.g.
+                                        training params and Readout module specifications, but not to the transferred model trunk.
+                                        However, we strongly recommend to make all trunk-parameters match, in order to be able
+                                        to restore from transferred checkpoints without having to pass a matching config manually.
+    --transfer_mode MODE            One of frozen, finetune (but not yet implemented) [default: frozen]
+                                        Mode frozen also sets all dropout in the restored model to zero (the newly initialized
+                                        readout function can have dropout nonetheless, depending on the config provided).
 """
-
+       
+ 
 import pickle, time, os, json, sys
 from pathlib import Path
 
@@ -27,8 +39,7 @@ from docopt import docopt
 import tqdm
 import numpy as np
 import torch
-from torch_geometric.data import Data, DataLoader, InMemoryDataset
-
+from torch_geometric.data import Data, InMemoryDataset, DataLoader # (see below)
 
 # make this file executable from anywhere
 #if __name__ == '__main__':
@@ -40,6 +51,7 @@ print(REPO_ROOT)
 sys.path.insert(1, REPO_ROOT)
 REPO_ROOT = Path(REPO_ROOT)
 
+from deeplearning.ml4pl.poj104.dataloader import NodeLimitedDataLoader
 
 from deeplearning.ml4pl.models.ggnn.modeling import (
     GGNNModel,
@@ -49,11 +61,20 @@ from deeplearning.ml4pl.models.ggnn.modeling import (
 from deeplearning.ml4pl.models.ggnn.configs import (
     ProGraMLBaseConfig,
     GGNN_POJ104_Config,
-    GGNN_POJ104_ForPretraining_Config,
-    GraphTransformerConfig,
+    GGNN_ForPretraining_Config,
+    GGNN_Devmap_Config,
+    GGNN_Threadcoarsening_Config,
+    GraphTransformer_POJ104_Config,
+    GraphTransformer_Devmap_Config,
+    GraphTransformer_Threadcoarsening_Config,
+    GraphTransformer_ForPretraining_Config,
 )
+
 from deeplearning.ml4pl.poj104.dataset import (
-    POJ104Dataset
+    POJ104Dataset,
+    NCCDataset,
+    ThreadcoarseningDataset,
+    DevmapDataset,
 )
 
 # Importing twice like this enables restoring
@@ -76,13 +97,25 @@ else:
 
 
 MODEL_CLASSES = {
-    'ggnn': (GGNNModel, GGNN_POJ104_Config),
-    'ggnn_for_pretraining': (GGNNForPretrainingModel, GGNN_POJ104_ForPretraining_Config),
-    'transformer': (GraphTransformerModel, GraphTransformerConfig),
+    'ggnn_poj104': (GGNNModel, GGNN_POJ104_Config),
+    'ggnn_devmap': (GGNNModel, GGNN_Devmap_Config),
+    'ggnn_threadcoarsening': (GGNNModel, GGNN_Threadcoarsening_Config),
+    'ggnn_pretraining': (GGNNForPretrainingModel, GGNN_ForPretraining_Config),
+    'transformer_poj104': (GraphTransformerModel, GraphTransformer_POJ104_Config),
+    'transformer_devmap': (GraphTransformerModel, GraphTransformer_Devmap_Config),
+    'transformer_threadcoarsening': (GraphTransformerModel, GraphTransformer_Threadcoarsening_Config),
+    'transformer_pretraining': (GraphTransformerModel, GraphTransformer_ForPretraining_Config),
 }
 
-DATASET_CLASSES = {
-    'poj104': POJ104Dataset,
+DATASET_CLASSES = { #DS, default data_dir,
+    'poj104': (POJ104Dataset, 'deeplearning/ml4pl/poj104/classifyapp_data'),
+    'ncc': (NCCDataset, 'deeplearning/ml4pl/poj104/unsupervised_ncc_data'),
+    'devmap_amd': (DevmapDataset, 'deeplearning/ml4pl/poj104/devmap_data'),
+    'devmap_nvidia': (DevmapDataset, 'deeplearning/ml4pl/poj104/devmap_data'),
+    'threadcoarsening_Cypress': (ThreadcoarseningDataset, 'deeplearning/ml4pl/poj104/threadcoarsening_data'),
+    'threadcoarsening_Tahiti': (ThreadcoarseningDataset, 'deeplearning/ml4pl/poj104/threadcoarsening_data'),
+    'threadcoarsening_Fermi': (ThreadcoarseningDataset, 'deeplearning/ml4pl/poj104/threadcoarsening_data'),
+    'threadcoarsening_Kepler': (ThreadcoarseningDataset, 'deeplearning/ml4pl/poj104/threadcoarsening_data'),
 }
 
 DEBUG = False
@@ -90,11 +123,7 @@ if DEBUG:
     torch.autograd.set_detect_anomaly(True)
 
 class Learner(object):
-    def __init__(self, model, dataset, args=None):
-        # get model and dataset
-        Model, Config = MODEL_CLASSES[model]
-        Dataset = DATASET_CLASSES[dataset]
-
+    def __init__(self, model, dataset, args=None, current_kfold_split=None):
         # Make class work without file being run as main
         self.args = docopt(__doc__, argv=[])
         if args:
@@ -103,39 +132,46 @@ class Learner(object):
         # prepare logging
         self.parent_run_id = None  # for restored models
         self.run_id = f"{time.strftime('%Y-%m-%d_%H:%M:%S')}_{RUN_ID}"
+        if args['--kfold']:
+            self.run_id += f'_{current_kfold_split}'
+
         log_dir = REPO_ROOT / self.args.get("--log_dir", '.')
         log_dir.mkdir(parents=True, exist_ok=True)
         self.log_file = log_dir / f"{self.run_id}_log.json"
         self.best_model_file = log_dir / f"{self.run_id}_model_best.pickle"
         self.last_model_file = log_dir / f"{self.run_id}_model_last.pickle"
 
-        # load config
-        params = self.parse_config_params(args)
-        self.config = Config.from_dict(params=params)
-
-        # set seeds, NB: the NN on CUDA is partially non-deterministic!
-        torch.manual_seed(self.config.random_seed)
-        np.random.seed(self.config.random_seed)
-
-        # load model
+        # ~~~~~~~~~~ load model ~~~~~~~~~~~~~
         if self.args.get('--restore'):
             self.model = self.restore_model(path=REPO_ROOT / self.args['--restore'])
         elif self.args.get('--restore_by_pattern'):
             self.model = self.restore_by_pattern(pattern=self.args['--restore_by_pattern'], log_dir=log_dir)
         else: # initialize fresh model
+            # get model and dataset
+            assert model, "Need to provide --model to initialize freshly."
+            Model, Config = MODEL_CLASSES[model]
+            
             self.global_training_step = 0
             self.current_epoch = 1
+            
+            # get config
+            params = self.parse_config_params(args)
+            self.config = Config.from_dict(params=params)
+            
             test_only = self.args.get('--test', False)
             self.model = Model(self.config, test_only=test_only)
 
-        # load data
-        self.data_dir = REPO_ROOT / self.args.get('--data_dir', '.')
-        self.valid_data = DataLoader(Dataset(root=self.data_dir, split='val'), batch_size=self.config.batch_size * 2, shuffle=False)
-        self.test_data = DataLoader(Dataset(root=self.data_dir, split='test'), batch_size=self.config.batch_size * 2, shuffle=False)
+        # set seeds, NB: the NN on CUDA is partially non-deterministic!
+        torch.manual_seed(self.config.random_seed)
+        np.random.seed(self.config.random_seed)
 
-        self.train_data = None
-        if not self.args.get('--test'):
-            self.train_data = DataLoader(Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset), batch_size=self.config.batch_size, shuffle=True)
+        # ~~~~~~~~~~ transfer model ~~~~~~~~
+        if self.args['--transfer'] is not None:
+            self.transfer_model(self.args['--transfer'], self.args['--transfer_mode'])
+
+
+        # ~~~~~~~~~~ load data ~~~~~~~~~~~~~
+        self.load_data(dataset, args['--kfold'], current_kfold_split)
 
         # log config to file
         config_dict = self.config.to_dict()
@@ -155,6 +191,97 @@ class Learner(object):
             "Run %s starting with following parameters:\n%s"
             % (self.run_id, json.dumps(config_dict))
         )
+
+    def load_data(self, dataset, kfold, current_kfold_split):
+        """Set self.train_data, self.test_data, self.valid_data depending on the dataset used."""
+        if not kfold: assert current_kfold_split is None
+        if '_' in dataset:
+            split = dataset.rsplit('_', maxsplit=1)[-1]
+        Dataset, data_dir = DATASET_CLASSES[dataset]
+        if self.args.get('--data_dir', '.'):
+            self.data_dir = REPO_ROOT / self.args.get('--data_dir', '.')
+        else:
+            self.data_dir = REPO_ROOT / data_dir
+
+        # Switch cases by dataset
+        # ~~~~~~~~~~ NCC ~~~~~~~~~~~~~~~~~~~~~
+        if dataset == 'ncc':
+            # train set
+            if not self.args.get('--test'):
+                # take train_subset=[90,100] as validation data
+                if self.config.train_subset == [0, 100]:
+                    print(f"!!!!!!!!  WARNING !!!!!!!!!!!!")
+                    print(f"SETTING TRAIN_SUBSET FROM [0,100] TO [0, 90]")
+                    print(f"!!!!!!!!  WARNING !!!!!!!!!!!!")
+                    self.config.train_subset = [0,90]
+                train_dataset = Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset)
+                train_dataset = train_dataset.filter_max_num_nodes(self.config.max_num_nodes)
+                self.train_data = NodeLimitedDataLoader(train_dataset,
+                                             batch_size=self.config.batch_size,
+                                             shuffle=True,
+                                             max_num_nodes=self.config.max_num_nodes,
+                                             warn_on_limit=True,
+                                            )
+            # valid set (and test set)
+            valid_dataset = Dataset(root=self.data_dir, split='train', train_subset=[90,100])
+            valid_dataset = valid_dataset.filter_max_num_nodes(self.config.max_num_nodes)
+            self.valid_data = DataLoader(valid_dataset, batch_size=self.config.batch_size * 2, shuffle=False)
+            self.test_data = None
+        # ~~~~~~~~~~ POJ 104 ~~~~~~~~~~~~~~~~~~~~~
+        elif dataset == 'poj104':
+            if not self.args.get('--test'):
+                train_dataset = Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset)
+                self.train_data = DataLoader(train_dataset,
+                                             batch_size=self.config.batch_size,
+                                             shuffle=True,
+                                             #max_num_nodes=self.config.max_num_nodes
+                                            )
+
+            self.valid_data = DataLoader(Dataset(root=self.data_dir, split='val'), batch_size=self.config.batch_size * 2, shuffle=False)
+            self.test_data = DataLoader(Dataset(root=self.data_dir, split='test'), batch_size=self.config.batch_size * 2, shuffle=False)
+
+        # ~~~~~~~~~~ DEVMAP ~~~~~~~~~~~~~~~~~~~~~
+        elif dataset in ['devmap_amd', 'devmap_nvidia']:
+            assert kfold and current_kfold_split is not None, "Devmap only supported with kfold flag!"
+            assert current_kfold_split < 10
+            # get the whole dataset then get the correct split
+            ds = Dataset(root=self.data_dir, split=split, train_subset=self.config.train_subset)
+            train_dataset, valid_dataset = ds.return_cross_validation_splits(current_kfold_split)
+            
+            self.train_data = None            
+            self.valid_data = DataLoader(valid_dataset, batch_size=self.config.batch_size * 2, shuffle=False)
+
+            # only maybe set train_data.
+            if not self.args.get('--test'):    
+                self.train_data = DataLoader(train_dataset,
+                                batch_size=self.config.batch_size,
+                                shuffle=True,
+                            )
+            self.test_data = None
+
+        # ~~~~~~~~~~ THREADCOARSENING ~~~~~~~~~~~~~~~~~~~~~
+        elif dataset in ['threadcoarsening' + '_' + s for s in ['Cypress', 'Tahiti', 'Fermi', 'Kepler']]:
+            assert kfold and current_kfold_split is not None, "Threadcoarsening only supported with kfold flag!"
+            assert current_kfold_split < 17 and current_kfold_split >= 0
+            if not self.args.get('--test'):
+                pass
+            # get the whole dataset then get the correct split
+            ds = Dataset(root=self.data_dir, split=split, train_subset=self.config.train_subset)
+            train_dataset, valid_dataset = ds.return_cross_validation_splits(current_kfold_split)
+            
+            self.train_data = None            
+            self.valid_data = DataLoader(valid_dataset, batch_size=self.config.batch_size * 2, shuffle=False)
+
+            # only maybe set train_data.
+            if not self.args.get('--test'):    
+                self.train_data = DataLoader(train_dataset,
+                                batch_size=self.config.batch_size,
+                                shuffle=True,
+                            )
+            self.test_data = None
+
+        else:
+            raise NotImplementedError
 
     def parse_config_params(self, args):
         """Accesses self.args to parse config params from various flags."""
@@ -187,13 +314,34 @@ class Learner(object):
 
         inputs = {
             "vocab_ids": batch.x[:,0],
-            "labels": batch.y - 1, # labels start at 0!!!
             "edge_lists": edge_lists,
             "pos_lists": edge_positions,
             "num_graphs": num_graphs,
             "graph_nodes_list": batch.batch,
             "node_types": batch.x[:,1],
         }
+        
+        # maybe add labels        
+        if batch.y is not None:
+            #TODO resolve this hack for poj104 which has classes from 1-104...
+            if self.args['--dataset'] == 'poj104':
+                inputs.update({
+                    "labels": batch.y - 1, # labels start at 0!!!
+             })
+            else:
+                inputs.update({
+                    "labels": batch.y,
+                })
+                
+        # add other stuff
+        if hasattr(batch, 'aux_in'):
+           inputs.update({
+               "aux_in": batch.aux_in.to(dtype=torch.float)
+           })
+        if hasattr(batch, 'runtimes'):
+            inputs.update({
+                "runtimes": batch.runtimes.to(dtype=torch.float)
+            })
         return inputs
 
     def bertify_batch(self, batch, config):
@@ -247,6 +395,7 @@ class Learner(object):
             saved_outputs = []
 
         epoch_loss, epoch_accuracy = 0, 0
+        epoch_actual_rt, epoch_optimal_rt = 0, 0
         start_time = time.time()
         processed_graphs = 0
         predicted_targets = 0
@@ -259,7 +408,8 @@ class Learner(object):
             inputs = self.data2input(batch)
             num_graphs = inputs['num_graphs']
 
-            if self.config.name == 'GGNN_POJ104_ForPretraining_Config': # only implemented nodewise model
+             # only implemented nodewise model are for pretraining currently
+            if self.config.name in ['GGNN_ForPretraining_Config', 'GraphTransformer_ForPretraining_Config']:
                 mlm_vocab_ids, mlm_labels, mlm_target_mask = self.bertify_batch(batch, self.config)
                 inputs.update({
                     'vocab_ids': mlm_vocab_ids,
@@ -296,9 +446,14 @@ class Learner(object):
                 # TODO I don't know whether the outputs are properly cloned, moved to cpu and detached or not.
                 saved_outputs.append(outputs)
 
-            (logits, accuracy, correct, targets, graph_features, *unroll_stats,
-            ) = outputs
-
+            if hasattr(batch, 'runtimes'):
+                (logits, accuracy, correct, targets, actual_rt, optimal_rt, graph_features, *unroll_stats,
+                ) = outputs
+                epoch_actual_rt += torch.sum(actual_rt).item()
+                epoch_optimal_rt += torch.sum(optimal_rt).item()
+            else:
+                (logits, accuracy, correct, targets, graph_features, *unroll_stats,
+                ) = outputs
             loss = self.model.loss((logits, graph_features), targets)
 
             epoch_loss += loss.item() * num_targets
@@ -328,7 +483,7 @@ class Learner(object):
         instance_per_sec = processed_graphs / (time.time() - start_time)
         epoch_perplexity = np.exp(mean_loss)
 
-        returns = (mean_loss, mean_accuracy, instance_per_sec, epoch_perplexity)
+        returns = (mean_loss, mean_accuracy, instance_per_sec, epoch_perplexity, epoch_actual_rt, epoch_optimal_rt)
 
         if analysis_mode:
             returns += (saved_outputs,)
@@ -341,7 +496,7 @@ class Learner(object):
         # we enter training after restore
         if self.parent_run_id is not None:
             print(f"== Epoch pre-validate epoch {self.current_epoch}")
-            _, valid_acc, _, ppl = self.run_epoch(self.valid_data, "val")
+            _, valid_acc, _, ppl, _, _ = self.run_epoch(self.valid_data, "val")
             best_val_acc = np.sum(valid_acc)
             best_val_acc_epoch = self.current_epoch
             print(
@@ -357,29 +512,31 @@ class Learner(object):
         for epoch in range(self.current_epoch, target_epoch):
             print(f"== Epoch {epoch}/{target_epoch}")
 
-            train_loss, train_acc, train_speed, train_ppl = self.run_epoch(
+            train_loss, train_acc, train_speed, train_ppl, train_art, train_ort = self.run_epoch(
                 self.train_data, "train"
             )
             print(
-                "\r\x1b[K Train: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
-                % (train_loss, f"{train_acc:.5f}", train_ppl, train_speed)
+                "\r\x1b[K Train: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f | runtime: %.1f opt: %.1f"
+                % (train_loss, f"{train_acc:.5f}", train_ppl, train_speed, train_art, train_ort)
             )
 
-            valid_loss, valid_acc, valid_speed, valid_ppl = self.run_epoch(
+            valid_loss, valid_acc, valid_speed, valid_ppl, valid_art, valid_ort = self.run_epoch(
                 self.valid_data, "eval"
             )
             print(
-                "\r\x1b[K Valid: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
-                % (valid_loss, f"{valid_acc:.5f}", valid_ppl, valid_speed)
+                "\r\x1b[K Valid: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f | runtime: %.1f opt: %.1f"
+                % (valid_loss, f"{valid_acc:.5f}", valid_ppl, valid_speed, valid_art, valid_ort)
             )
 
-            test_loss, test_acc, test_speed, test_ppl = self.run_epoch(
-                self.test_data, "eval"
-            )
-            print(
-                "\r\x1b[K Test: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
-                % (test_loss, f"{test_acc:.5f}", test_ppl, test_speed)
-            )
+            # maybe run test epoch
+            if self.test_data is not None:
+                test_loss, test_acc, test_speed, test_ppl, _, _ = self.run_epoch(
+                    self.test_data, "eval"
+                )
+                print(
+                    "\r\x1b[K Test: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
+                    % (test_loss, f"{test_acc:.5f}", test_ppl, test_speed)
+                )
 
             epoch_time = time.time() - total_time_start
             self.current_epoch = epoch
@@ -387,11 +544,15 @@ class Learner(object):
             log_entry = {
                 "epoch": epoch,
                 "time": epoch_time,
-                "train_results": (train_loss, train_acc, train_speed, train_ppl),
-                "valid_results": (valid_loss, valid_acc, valid_speed, valid_ppl),
-                "test_results": (test_loss, test_acc, test_speed, test_ppl),
+                "train_results": (train_loss, train_acc, train_speed, train_ppl, train_art, train_ort),
+                "valid_results": (valid_loss, valid_acc, valid_speed, valid_ppl, valid_art, valid_ort),
             }
+
+            if self.test_data is not None:
+                log_entry.update({"test_results": (test_loss, test_acc, test_speed, test_ppl)})
+
             log_to_save.append(log_entry)
+
             with open(self.log_file, "w") as f:
                 json.dump(log_to_save, f, indent=4)
 
@@ -420,29 +581,33 @@ class Learner(object):
 
         print(f"== Epoch: Test only run.")
 
-        valid_loss, valid_acc, valid_speed, valid_ppl = self.run_epoch(
+        valid_loss, valid_acc, valid_speed, valid_ppl, valid_art, valid_ort = self.run_epoch(
             self.valid_data, "eval"
         )
         print(
-            "\r\x1b[K Valid: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
-            % (valid_loss, f"{valid_acc:.5f}", valid_ppl, valid_speed)
+            "\r\x1b[K Valid: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f | runtime: %.1f opt: %.1f"
+            % (valid_loss, f"{valid_acc:.5f}", valid_ppl, valid_speed, valid_art, valid_ort)
         )
 
-        test_loss, test_acc, test_speed, test_ppl = self.run_epoch(
-            self.test_data, "eval"
-        )
-        print(
-            "\r\x1b[K Test: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
-            % (test_loss, f"{test_acc:.5f}", test_ppl, test_speed)
-        )
+        if self.test_data is not None:
+            test_loss, test_acc, test_speed, test_ppl, _, _ = self.run_epoch(
+                self.test_data, "eval"
+            )
+            print(
+                "\r\x1b[K Test: loss: %.5f | acc: %s | ppl: %s | instances/sec: %.2f"
+                % (test_loss, f"{test_acc:.5f}", test_ppl, test_speed)
+            )
 
         epoch_time = time.time() - total_time_start
+
         log_entry = {
             "epoch": 'test_only',
             "time": epoch_time,
-            "valid_results": (valid_loss, valid_acc, valid_speed, valid_ppl),
-            "test_results": (test_loss, test_acc, test_speed, test_ppl),
+            "valid_results": (valid_loss, valid_acc, valid_speed, valid_ppl, valid_art, valid_ort),
         }
+        if self.test_data is not None:
+            log_entry.update({"test_results": (test_loss, test_acc, test_speed, test_ppl)})
+
         log_to_save.append(log_entry)
         with open(self.log_file, "w") as f:
             json.dump(log_to_save, f, indent=4)
@@ -459,10 +624,16 @@ class Learner(object):
         }
         torch.save(checkpoint, path)
 
-    def restore_by_pattern(self, pattern, log_dir):
-        """this will restore the last checkpoint of a run that is identifiable by
-        the pattern <pattern>. It could restore to model_last or model_best."""
-        checkpoints = list(log_dir.glob(f"*{pattern}*model*.p*"))
+    def restore_by_pattern(self, pattern, log_dir, current_kfold_split=None):
+        """This method will restore the last checkpoint of a run that is identifiable by
+        the pattern <pattern>. It could restore to model_last or model_best.
+        However if current_kfold_split is given, it will additionally filter for this split!
+        Therefore the split should not be part of the pattern.
+        """
+        if current_kfold_split is not None:
+            checkpoints = list(log_dir.glob(f"*{pattern}*_{current_kfold_split}_model_*.p*"))
+        else:
+            checkpoints = list(log_dir.glob(f"*{pattern}*_model_*.p*"))
         last_mod_checkpoint = sorted(checkpoints, key=os.path.getmtime)[-1]
         assert last_mod_checkpoint.is_file(), f"Couldn't restore by jobname: No model files matching <{pattern}> found."
         return self.restore_model(last_mod_checkpoint)
@@ -475,12 +646,23 @@ class Learner(object):
         self.current_epoch = checkpoint['epoch']
 
         config_dict = checkpoint['config'] if isinstance(checkpoint['config'], dict) else checkpoint['config'].to_dict()
+
         if not self.args.get('--skip_restore_config'):
+            # maybe zero out dropout attributes
+            if self.args['--transfer'] is not None and self.args['--transfer_mode'] == 'frozen':
+                for key, value in config_dict.items():
+                    if 'dropout' in key:
+                        config_dict[key] = 0.0
+                        print(f"*Restoring Config* Setting {key} from {value} to 0.0 while restoring config from checkpoint for transfer.")
             config = getattr(configs, config_dict['name']).from_dict(config_dict)
             self.config = config
             print(f'*RESTORED* self.config = {config.name} from checkpoint {str(path)}.')
         else:
             print(f'Skipped restoring self.config from checkpoint!')
+            assert self.args.get('--model') is not None, "Can only use --skip_restore_config if --model is given."
+            # initialize config from --model and compare to skipped config from restore.
+            _, Config = MODEL_CLASSES[self.args['--model']]
+            self.config = Config.from_dict(self.parse_config_params(args))
             self.config.check_equal(config_dict)
 
         test_only = self.args.get('--test', False)
@@ -493,16 +675,67 @@ class Learner(object):
             print(f'*RESTORED* optimizer parameters from checkpoint as well.')
         return model
 
+    def transfer_model(self, transfer_model_class, mode):
+        """transfers the current model to a different model class.
+        Resets global_training_step and current_epoch.
+
+        Mode:
+            frozen - only the new readout module will receive gradients.
+            finetune - the whole network will receive gradients.
+        """
+        assert transfer_model_class in MODEL_CLASSES
+        self.global_training_step = 0
+        self.current_epoch = 1
+        
+        # freeze layers
+        if mode == 'frozen':
+            for param in self.model.parameters():
+                param.requires_grad = False
+
+        # replace config
+        _, Config = MODEL_CLASSES[transfer_model_class]
+        params = self.parse_config_params(self.args)
+        self.config = Config.from_dict(params=params)
+        # replace readout
+        if getattr(self.config, 'has_aux_input', False):
+            self.model.readout = modeling.BetterAuxiliaryReadout(self.config)
+        else:
+            self.model.readout = modeling.Readout(self.config)
+        self.model.config = self.config
+        # maybe add aux_readout
+        #if getattr(self.config, 'has_aux_input', False):
+        #    self.model.has_aux_input = True
+        #    self.model.aux_readout = modeling.AuxiliaryReadout(self.config)
+        
+        # re-setup model
+        test_only = self.args.get('--test', False)
+        assert not test_only, "Why transfer if you don't train? Here is not restoring a transferred model!!!"
+        self.model.setup(self.config, test_only)
+        # print info
+        print(self.model)
+        print(f"Number of trainable params in transferred model: {self.model.num_parameters()}")
+
 
 if __name__ == '__main__':
     args = docopt(__doc__)
     print(args)
     assert not (args['--config'] and args['--config_json']), "Can't decide which config to use!"
-    assert args['--model'].lower() in MODEL_CLASSES or not args['--model'], f'Unknown model.'
-    assert args['--dataset'].lower() in DATASET_CLASSES or not args['--dataset'], f'Unknown dataset.'
+    if args.get('--model'):
+        assert args.get('--model') in MODEL_CLASSES, f'Unknown model.'
+    if args.get('--dataset'):
+        assert args.get('--dataset') in DATASET_CLASSES, f'Unknown dataset.'
 
-    learner = Learner(model=args['--model'], dataset=args['--dataset'], args=args)
-    if args.get('--test', None):
-        learner.test()
-    else:
-        learner.train()
+    if not args['--kfold']:
+        learner = Learner(model=args['--model'], dataset=args['--dataset'], args=args)
+        learner.test() if args.get('--test') else learner.train()
+    else:  # kfold
+        if args['--dataset'] in ['devmap_amd', 'devmap_nvidia']: num_splits = 10
+        elif args['--dataset'] in ['threadcoarsening_Cypress', 'threadcoarsening_Kepler', 'threadcoarsening_Fermi', 'threadcoarsening_Tahiti']: num_splits = 17
+        else: raise NotImplementedError("kfold not implemented for this dataset.")
+
+        for split in range(num_splits):
+            print(f"#######################################")
+            print(f"CURRENT SPLIT: {split} + 1/{num_splits}")
+            print(f"#######################################")
+            learner = Learner(model=args['--model'], dataset=args['--dataset'], args=args, current_kfold_split=split)
+            learner.test() if args.get('--test') else learner.train()

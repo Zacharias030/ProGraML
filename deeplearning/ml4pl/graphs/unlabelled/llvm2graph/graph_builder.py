@@ -18,7 +18,7 @@
 A ProGraML graph is a directed multigraph which is the union a control flow,
 data flow, and call graphs.
 """
-#import signal
+import signal
 import typing
 
 import networkx as nx
@@ -76,25 +76,25 @@ class ProGraMLGraphBuilder(object):
       A networkx graph.
     """
 
-    #def _RaiseTimoutError(signum, frame):
-    #  del signum
-    #  del frame
-    #  raise TimeoutError(
-    #    f"Graph construction did not complete within {timeout_seconds} seconds"
-    #  )
+    def _RaiseTimoutError(signum, frame):
+      del signum
+      del frame
+      raise TimeoutError(
+        f"Graph construction did not complete within {timeout_seconds} seconds"
+      )
 
     # Register a function to raise a TimeoutError on the signal.
-    #signal.signal(signal.SIGALRM, _RaiseTimoutError)
-    #signal.alarm(timeout_seconds)
+    signal.signal(signal.SIGALRM, _RaiseTimoutError)
+    signal.alarm(timeout_seconds)
 
     try:
       return self._Build(bytecode, tag_hook)
     except TimeoutError as e:
       raise e
-    #finally:
+    finally:
       # Unregister the signal so it won't be triggered
       # if the timeout is not reached.
-      #signal.signal(signal.SIGALRM, signal.SIG_IGN)
+      signal.signal(signal.SIGALRM, signal.SIG_IGN)
 
   def _Build(self, bytecode: str, tag_hook: llvm_util.TagHook):
     """Private implementation of Build function."""
