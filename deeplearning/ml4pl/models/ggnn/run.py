@@ -30,8 +30,8 @@ Options:
                                         Mode frozen also sets all dropout in the restored model to zero (the newly initialized
                                         readout function can have dropout nonetheless, depending on the config provided).
 """
-       
- 
+
+
 import pickle, time, os, json, sys
 from pathlib import Path
 
@@ -55,7 +55,6 @@ from deeplearning.ml4pl.poj104.dataloader import NodeLimitedDataLoader
 
 from deeplearning.ml4pl.models.ggnn.modeling import (
     GGNNModel,
-    GGNNForPretrainingModel,
     GraphTransformerModel,
 )
 from deeplearning.ml4pl.models.ggnn.configs import (
@@ -100,7 +99,7 @@ MODEL_CLASSES = {
     'ggnn_poj104': (GGNNModel, GGNN_POJ104_Config),
     'ggnn_devmap': (GGNNModel, GGNN_Devmap_Config),
     'ggnn_threadcoarsening': (GGNNModel, GGNN_Threadcoarsening_Config),
-    'ggnn_pretraining': (GGNNForPretrainingModel, GGNN_ForPretraining_Config),
+    'ggnn_pretraining': (GGNNModel, GGNN_ForPretraining_Config),
     'transformer_poj104': (GraphTransformerModel, GraphTransformer_POJ104_Config),
     'transformer_devmap': (GraphTransformerModel, GraphTransformer_Devmap_Config),
     'transformer_threadcoarsening': (GraphTransformerModel, GraphTransformer_Threadcoarsening_Config),
@@ -150,14 +149,14 @@ class Learner(object):
             # get model and dataset
             assert model, "Need to provide --model to initialize freshly."
             Model, Config = MODEL_CLASSES[model]
-            
+
             self.global_training_step = 0
             self.current_epoch = 1
-            
+
             # get config
             params = self.parse_config_params(args)
             self.config = Config.from_dict(params=params)
-            
+
             test_only = self.args.get('--test', False)
             self.model = Model(self.config, test_only=test_only)
 
@@ -247,12 +246,12 @@ class Learner(object):
             # get the whole dataset then get the correct split
             ds = Dataset(root=self.data_dir, split=split, train_subset=self.config.train_subset)
             train_dataset, valid_dataset = ds.return_cross_validation_splits(current_kfold_split)
-            
-            self.train_data = None            
+
+            self.train_data = None
             self.valid_data = DataLoader(valid_dataset, batch_size=self.config.batch_size * 2, shuffle=False)
 
             # only maybe set train_data.
-            if not self.args.get('--test'):    
+            if not self.args.get('--test'):
                 self.train_data = DataLoader(train_dataset,
                                 batch_size=self.config.batch_size,
                                 shuffle=True,
@@ -268,12 +267,12 @@ class Learner(object):
             # get the whole dataset then get the correct split
             ds = Dataset(root=self.data_dir, split=split, train_subset=self.config.train_subset)
             train_dataset, valid_dataset = ds.return_cross_validation_splits(current_kfold_split)
-            
-            self.train_data = None            
+
+            self.train_data = None
             self.valid_data = DataLoader(valid_dataset, batch_size=self.config.batch_size * 2, shuffle=False)
 
             # only maybe set train_data.
-            if not self.args.get('--test'):    
+            if not self.args.get('--test'):
                 self.train_data = DataLoader(train_dataset,
                                 batch_size=self.config.batch_size,
                                 shuffle=True,
@@ -320,8 +319,8 @@ class Learner(object):
             "graph_nodes_list": batch.batch,
             "node_types": batch.x[:,1],
         }
-        
-        # maybe add labels        
+
+        # maybe add labels
         if batch.y is not None:
             #TODO resolve this hack for poj104 which has classes from 1-104...
             if self.args['--dataset'] == 'poj104':
@@ -332,7 +331,7 @@ class Learner(object):
                 inputs.update({
                     "labels": batch.y,
                 })
-                
+
         # add other stuff
         if hasattr(batch, 'aux_in'):
            inputs.update({
@@ -686,7 +685,7 @@ class Learner(object):
         assert transfer_model_class in MODEL_CLASSES
         self.global_training_step = 0
         self.current_epoch = 1
-        
+
         # freeze layers
         if mode == 'frozen':
             for param in self.model.parameters():
@@ -696,17 +695,20 @@ class Learner(object):
         _, Config = MODEL_CLASSES[transfer_model_class]
         params = self.parse_config_params(self.args)
         self.config = Config.from_dict(params=params)
+
         # replace readout
-        if getattr(self.config, 'has_aux_input', False):
+        if getattr(self.config, 'has_aux_input', False) and getattr(self.config, 'aux_use_better', False):
             self.model.readout = modeling.BetterAuxiliaryReadout(self.config)
-        else:
+        elif getattr(self.config, 'has_aux_input', False):
             self.model.readout = modeling.Readout(self.config)
+            self.model.aux_readout = modeling.AuxiliaryReadout(self.config)
+        else:
+            assert not getattr(self.config, 'aux_use_better', False), 'aux_use_better only with has_aux_input!'
+            self.model.readout = modeling.Readout(self.config)
+
+        # assign config to model
         self.model.config = self.config
-        # maybe add aux_readout
-        #if getattr(self.config, 'has_aux_input', False):
-        #    self.model.has_aux_input = True
-        #    self.model.aux_readout = modeling.AuxiliaryReadout(self.config)
-        
+
         # re-setup model
         test_only = self.args.get('--test', False)
         assert not test_only, "Why transfer if you don't train? Here is not restoring a transferred model!!!"

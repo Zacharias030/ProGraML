@@ -127,7 +127,7 @@
                 "--log_dir",
                 "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
                 "--model",
-                "ggnn",
+                "ggnn_poj104",
                 "--dataset",
                 "poj104",
                 "--config_json",

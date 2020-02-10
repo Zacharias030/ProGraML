@@ -68,12 +68,18 @@ class BaseGNNModel(nn.Module):
     def get_optimizer(self, config):
         return optim.AdamW(self.parameters(), lr=config.lr)
 
-    def forward(self, vocab_ids, labels, edge_lists,
+    def num_parameters(self) -> int:
+        """Compute the number of trainable parameters in this nn.Module and its children."""
+        num_params = sum(param.numel() for param in self.parameters(recurse=True) if param.requires_grad)
+        return f"{num_params:,} params, weights size: ~{num_params * 4 // 1e6:,}MB."
+
+    def forward(self, vocab_ids, labels, edge_lists, selector_ids=None,
                 pos_lists=None, num_graphs=None, graph_nodes_list=None,
                 node_types=None, aux_in=None, test_time_steps=None, readout_mask=None, runtimes=None,
         ):
         # Input
-        raw_in = self.node_embeddings(vocab_ids)
+        # selector_ids are ignored anyway by the NodeEmbeddings module that doesn't support them.
+        raw_in = self.node_embeddings(vocab_ids, selector_ids)
 
         # GNN
         raw_out, raw_in, *unroll_stats = self.gnn(
@@ -98,11 +104,12 @@ class BaseGNNModel(nn.Module):
             graphwise_readout = None
             logits = nodewise_readout
 
-        #if getattr(self.config, 'has_aux_input', False):
-        #    assert self.config.has_graph_labels is True, \
-        #        "Implementation hasn't been checked for use with aux_input and nodewise prediction! It could work or fail silently."
-        #    assert aux_in is not None
-        #    logits, graphwise_readout = self.aux_readout(logits, aux_in)
+        # do the old style aux_readout if not aux_use_better is set
+        if getattr(self.config, 'has_aux_input', False) and not getattr(self.config, 'aux_use_better', False):
+            assert self.config.has_graph_labels is True, \
+                "Implementation hasn't been checked for use with aux_input and nodewise prediction! It could work or fail silently."
+            assert aux_in is not None
+            logits, graphwise_readout = self.aux_readout(logits, aux_in)
 
 
         if readout_mask is not None:  # need to mask labels in the same fashion.
@@ -118,11 +125,6 @@ class BaseGNNModel(nn.Module):
 
         return outputs
 
-    def num_parameters(self) -> int:
-        """Compute the number of trainable parameters in this nn.Module and its children."""
-        num_params = sum(param.numel() for param in self.parameters(recurse=True) if param.requires_grad)
-        return f"{num_params:,} params, weights size: ~{num_params * 4 // 1e6:,}MB."
-
 
 class GraphTransformerModel(BaseGNNModel):
     """Transformer Encoder for Graphs."""
@@ -131,38 +133,26 @@ class GraphTransformerModel(BaseGNNModel):
         self.config = config
         self.node_embeddings = NodeEmbeddings(config)
         self.gnn = GraphTransformerEncoder(config)
-        self.readout = Readout(config)
 
-        # maybe tack on the aux readout
+
+        # get readout and maybe tack on the aux readout
         self.has_aux_input = getattr(self.config, "has_aux_input", False)
-        if self.has_aux_input:
-            #self.aux_readout = AuxiliaryReadout(config)
+        self.aux_use_better = getattr(self.config, 'aux_use_better', False)
+        
+        if self.has_aux_input and self.aux_use_better:
             self.readout = BetterAuxiliaryReadout(config)
-        else:
+        elif self.has_aux_input:
             self.readout = Readout(config)
-            
+            self.aux_readout = AuxiliaryReadout(config)
+        else:
+            assert not self.aux_use_better, 'aux_use_better only with has_aux_input!'
+            self.readout = Readout(config)
 
         self.metrics = Metrics()
 
         self.setup(config, test_only)
         print(self)
         print(f"Number of trainable params in GraphTransformerModel: {self.num_parameters()}")
-
-
-class GGNNForPretrainingModel(BaseGNNModel):
-    """Gated Graph Neural Network model for pretraining"""
-    def __init__(self, config, pretrained_embeddings=None, test_only=False):
-        super().__init__()
-        self.config = config
-        self.node_embeddings = NodeEmbeddings(config) #NodeEmbeddingsForPretraining(config)
-        self.gnn = GGNNEncoder(config)
-        self.readout = Readout(config)
-
-        self.metrics = Metrics()
-
-        self.setup(config, test_only)
-        print(self)
-        print(f"Number of trainable params in GGNNForPretrainingModel: {self.num_parameters()}")
 
 
 class GGNNModel(BaseGNNModel):
@@ -178,18 +168,21 @@ class GGNNModel(BaseGNNModel):
 
 
         # Readout layer
-        self.readout = Readout(config)
+        # get readout and maybe tack on the aux readout
+        self.has_aux_input = getattr(self.config, "has_aux_input", False)
+        self.aux_use_better = getattr(self.config, 'aux_use_better', False)
+        if self.has_aux_input and self.aux_use_better:
+            self.readout = BetterAuxiliaryReadout(config)
+        elif self.has_aux_input:
+            self.readout = Readout(config)
+            self.aux_readout = AuxiliaryReadout(config)
+        else:
+            assert not self.aux_use_better, 'aux_use_better only with has_aux_input!'
+            self.readout = Readout(config)
 
         # GNN
         # make readout available to label_convergence tests in GGNN Proper (at runtime)
         self.gnn = GGNNEncoder(config, readout=self.readout)
-
-
-        # maybe tack on the aux readout
-        self.has_aux_input = getattr(self.config, "has_aux_input", False)
-        if self.has_aux_input:
-            assert False, "implement better auxiliary readout."
-            self.aux_readout = AuxiliaryReadout(config)
 
         # eval and training
         self.metrics = Metrics()
@@ -197,52 +190,6 @@ class GGNNModel(BaseGNNModel):
         self.setup(config, test_only)
         print(self)
         print(f"Number of trainable params in GGNNModel: {self.num_parameters()}")
-
-
-    def forward(
-        self,
-        vocab_ids,
-        labels,
-        edge_lists,
-        selector_ids=None,
-        pos_lists=None,
-        num_graphs=None,
-        graph_nodes_list=None,
-        node_types=None,
-        aux_in=None,
-        test_time_steps=None,
-        runtimes=None,
-    ):
-        raw_in = self.node_embeddings(vocab_ids, selector_ids)
-        raw_out, raw_in, *unroll_stats = self.gnn(
-            edge_lists, raw_in, pos_lists, node_types, test_time_steps
-        )  # OBS! self.gnn might change raw_in inplace, so use the two outputs
-        # instead!
-
-        if self.config.has_graph_labels:
-            assert graph_nodes_list is not None and num_graphs is not None, 'has_graph_labels requires graph_nodes_list and num_graphs tensors.'
-        nodewise_readout, graphwise_readout = self.readout(
-            raw_in,
-            raw_out,
-            graph_nodes_list=graph_nodes_list,
-            num_graphs=num_graphs
-        )
-
-        logits = graphwise_readout if self.config.has_graph_labels else nodewise_readout
-        if self.has_aux_input:
-            assert self.config.has_graph_labels is True, \
-                "Implementation hasn't been checked for use with aux_input and nodewise prediction! It could work or fail silently."
-            logits, graphwise_readout = self.aux_readout(logits, aux_in)
-
-        # accuracy, pred_targets, correct, targets
-        metrics_tuple = self.metrics(logits, labels, runtimes)
-
-        outputs = (
-            (logits,) + metrics_tuple + (graphwise_readout,) + tuple(unroll_stats)
-        )
-
-        return outputs
-
 
 ################################################
 # GNN Encoder: Message+Aggregate, Update

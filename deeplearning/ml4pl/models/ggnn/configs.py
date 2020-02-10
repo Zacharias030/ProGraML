@@ -120,6 +120,7 @@ class GGNN_Devmap_Config(GGNN_POJ104_Config):
         self.graph_state_dropout = 0.0
 
         # Auxiliary Readout
+        self.aux_use_better = False
         self.intermediate_loss_weight = 0.2
         self.aux_in_size = 2
         self.aux_in_layer_size = 32
@@ -208,6 +209,7 @@ class GraphTransformer_Devmap_Config(GraphTransformer_POJ104_Config):
         self.graph_state_dropout = 0.0
 
         # Auxiliary Readout
+        self.aux_use_better = False
         self.intermediate_loss_weight = 0.2
         self.aux_in_size = 2
         self.aux_in_layer_size = 32
