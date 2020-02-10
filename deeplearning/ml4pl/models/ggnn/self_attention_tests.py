@@ -89,7 +89,7 @@ print("bc. the reference implementation indexes the attn_mask <target, src>")
 print(attn_mask.t())
 
 edge_index = utils.dense_to_sparse(adj)[0]
-print(edge_index.size())
+print(edge_index.size())  # <2, M>
 #print(edge_index.t()[:10])
 
 x = torch.randint(9000, (num_n,))
@@ -138,7 +138,7 @@ print(sa_weights_matrix)
 # In[1]
 
 # assert similarity of attention weights for complete graphs
-torch.all(torch.abs(da_weights.squeeze() - sa_weights_matrix ) < 1e-7)
+torch.all(torch.abs(da_weights.squeeze() - sa_weights_matrix) < 1e-7)
 
 # assert similarity of self-attention output (new node states)
 torch.all(torch.abs(da_node_states.squeeze() - sa_node_states) < 1e-7)
