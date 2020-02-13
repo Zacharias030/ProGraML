@@ -29,6 +29,7 @@ Options:
     --transfer_mode MODE            One of frozen, finetune (but not yet implemented) [default: frozen]
                                         Mode frozen also sets all dropout in the restored model to zero (the newly initialized
                                         readout function can have dropout nonetheless, depending on the config provided).
+    --skip_save_every_epoch         Save latest model after every epoch (on a rolling basis).
 """
 
 
@@ -573,6 +574,8 @@ class Learner(object):
                     % self.config.patience
                 )
                 break
+            if not self.args['--skip_save_every_epoch']:
+                self.save_model(epoch, self.last_model_file)
         # save last model on finish of training
         self.save_model(epoch, self.last_model_file)
 
