@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "/home/zacharias/anaconda3/bin/python",
+    "python.pythonPath": "/users/zfisches/miniconda3/bin/python",
     "files.watcherExclude": {
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true,
@@ -16,5 +16,24 @@
         "datasets/**": true
     },
     "debug.node.autoAttach": "off",
-    "python.jediEnabled": false
+    "python.jediEnabled": false,
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#a69506",
+        "activityBar.activeBorder": "#09f6dd",
+        "activityBar.foreground": "#15202b",
+        "activityBar.inactiveForeground": "#15202b99",
+        "activityBarBadge.background": "#09f6dd",
+        "activityBarBadge.foreground": "#15202b",
+        "titleBar.activeBackground": "#756904",
+        "titleBar.inactiveBackground": "#75690499",
+        "titleBar.activeForeground": "#e7e7e7",
+        "titleBar.inactiveForeground": "#e7e7e799",
+        "statusBar.background": "#756904",
+        "statusBarItem.hoverBackground": "#a69506",
+        "statusBar.foreground": "#e7e7e7"
+    },
+    "peacock.remoteColor": "#756904",
+    "python.linting.flake8Enabled": false,
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true
 }

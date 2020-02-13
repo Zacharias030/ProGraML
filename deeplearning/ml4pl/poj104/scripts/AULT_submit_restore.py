@@ -27,7 +27,7 @@ source /users/zfisches/.bash_profile;
 cd /users/zfisches/ProGraML;
 
 srun python deeplearning/ml4pl/models/ggnn/run_ggnn_poj104.py \
---log_dir=deeplearning/ml4pl/poj104/classifyapp_logs/{subfolder}/ \
+--log_dir=deeplearning/ml4pl/poj104/logs/{subfolder}/ \
 --restore={checkpoint} \
 """  # NO WHITESPACE!!!
 

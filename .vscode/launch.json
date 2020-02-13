@@ -23,7 +23,7 @@
             //"justMyCode": false,
             "args": [
                 "--log_dir",
-                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "deeplearning/ml4pl/poj104/logs/debug_trash_folder/",
                 "--model",
                 "transformer_threadcoarsening",
                 "--dataset",

@@ -206,7 +206,9 @@ class GraphTransformer_Devmap_Config(GraphTransformer_POJ104_Config):
         self.batch_size = 64
         self.lr = 2.5e-4
         self.num_epochs = 150
-        self.graph_state_dropout = 0.0
+        #self.graph_state_dropout = 0.0 #GGNN only
+        
+        #self.output_dropout # <- applies to Readout func!
 
         # Auxiliary Readout
         self.aux_use_better = False

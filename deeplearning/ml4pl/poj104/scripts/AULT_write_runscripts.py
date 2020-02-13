@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import hashlib, sys, os
 import itertools
 from pathlib import Path
@@ -12,9 +13,10 @@ sys.path.insert(1, repo_root)
 repo_root = Path(repo_root)
 
 
-from deeplearning.ml4pl.models.ggnn.configs import ProGraMLBaseConfig as BaseConfig
+#from deeplearning.ml4pl.models.ggnn.configs import ProGraMLBaseConfig as BaseConfig
+from deeplearning.ml4pl.models.ggnn.run import MODEL_CLASSES
 
-SCRIPTS_FOLDER = repo_root / 'deeplearning' / 'ml4pl' / 'scripts' / 'poj104'
+SCRIPTS_FOLDER = repo_root / 'deeplearning' / 'ml4pl' / 'poj104' / 'scripts'
 SCRIPTS_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
@@ -24,19 +26,21 @@ def stamp(stuff):
     return hex_dig[:7]
 
 
-def config_generator(choices_dict):
+def config_generator(choices_dict, model):
     # GGNN DEVMAP HYPER OPT SERIES
     # devices = [0,1,2,3]
     value_list = [choices_dict[k] for k in choices_dict]
     configs = list(itertools.product(*value_list))
     for c in configs:
         manual_choices = dict(zip(choices_dict.keys(), c))
-        config_dict = BaseConfig.from_dict(manual_choices).to_dict()
+        Config = MODEL_CLASSES[model][1]
+        config_dict = Config.from_dict(manual_choices).to_dict()
         yield config_dict
 
 
-def write_runscripts(subfolder, template, choices_dict, jobname, steps):
-    configs = list(config_generator(choices_dict))
+def write_runscripts(subfolder, template, choices_dict, jobname, steps,
+                     model, dataset, kfold, transfer):
+    configs = list(config_generator(choices_dict, model))
     outpath = SCRIPTS_FOLDER / subfolder
     outpath.mkdir(exist_ok = True, parents=True)
 
@@ -65,6 +69,10 @@ def write_runscripts(subfolder, template, choices_dict, jobname, steps):
                 "subfolder": subfolder,
                 "jobname": jobname,
                 "restore_by_pattern": resto_str,
+                "model": model,
+                "dataset": dataset,
+                "kfold": kfold,
+                "transfer": transfer,
                 }
 
             runscript = template.format(**template_format)
@@ -81,10 +89,10 @@ def write_runscripts(subfolder, template, choices_dict, jobname, steps):
 
 
 if __name__ == "__main__":
-    from deeplearning.ml4pl.poj104.AULT_example_runscript_config import template, choices_dict, subfolder, resubmit_template, jobname, resubmit_times_per_job
-
-    args = sys.argv[1:]
-    if len(args) > 0:
-        print('Usage: python AULT_training_pipeline.py')
-    else:
-        write_runscripts(subfolder=subfolder, template=template, choices_dict=choices_dict, jobname=jobname, steps=resubmit_times_per_job)
+    #from deeplearning.ml4pl.poj104.scripts.AULT_example_runscript_config import template, choices_dict, subfolder, resubmit_template, jobname, resubmit_times_per_job
+    print('cannot directly run this here. run your experiment file instead!')
+#    args = sys.argv[1:]
+ #   if len(args) != 1:
+  #      print('Usage: python AULT_your_experiment_script.py')
+    #else:
+   #    write_runscripts(subfolder=subfolder, template=template, choices_dict=choices_dict, jobname=jobname, steps=resubmit_times_per_job)

@@ -66,8 +66,149 @@ def nx2data(nx_graph, class_label=None):
     return data
 
 
+
+class NewNCCDataset(InMemoryDataset):
+    def __init__(self, root='deeplearning/ml4pl/poj104/fresh_new_unsupervised_ncc_data',
+                 split='train',
+                 transform=None, pre_transform=None,
+                 train_subset=[0, 100],
+                 train_subset_seed=0):
+        """
+        NCC dataset from the new v20.02.06 tag preprocessing poj104/preprocess.sh /path/to/unzipped/ncc/downloads.
+
+        Args:
+            train_subset: [start_percentile, stop_percentile)    default [0,100).
+                            sample a random (but fixed) train set of data in slice by percent, with given seed.
+            train_subset_seed: seed for the train_subset fixed random permutation.
+
+        """
+        self.split = split
+        self.train_subset = train_subset
+        self.train_subset_seed = train_subset_seed
+        super().__init__(root, transform, pre_transform)
+
+        assert split in ['train'], "The NCC dataset only has a 'train' split. use train_subset=[0,x] and [x, 100] for training and testing."
+        self.data, self.slices = torch.load(self.processed_paths[0])
+
+    @property
+    def raw_file_names(self):
+        """A list of files that need to be found in the raw_dir in order to skip the download"""
+        return []  # not implemented here
+
+    @property
+    def processed_file_names(self):
+        """A list of files in the processed_dir which needs to be found in order to skip the processing."""
+        base = f'{self.split}_data.pt'
+
+        if tuple(self.train_subset) == (0, 100) or self.split in ['val', 'test']:
+            return [base]
+        else:
+            assert self.split == 'train'
+            return [f'{self.split}_data_subset_{self.train_subset[0]}_{self.train_subset[1]}_seed_{self.train_subset_seed}.pt']
+
+    def download(self):
+        """Download raw data to `self.raw_dir`"""
+        pass  # not implemented
+
+    def _save_train_subset(self):
+        """saves a train_subset of self to file.
+        Percentile slice is taken according to self.train_subset
+        with a fixed random permutation with self.train_subset_seed.
+        """
+        import numpy as np
+        perm = np.random.RandomState(self.train_subset_seed).permutation(len(self))
+
+        # take slice of perm according to self.train_subset
+        start = np.math.floor(len(self) / 100 * self.train_subset[0])
+        stop = np.math.floor(len(self) / 100 * self.train_subset[1])
+        perm = perm[start:stop]
+        print(f'Fixed permutation starts with: {perm[:min(30, len(perm))]}')
+
+        dataset = self.__indexing__(perm)
+
+        data, slices = dataset.data, dataset.slices
+        torch.save((data, slices), self.processed_paths[0])
+        return
+
+    def filter_max_num_nodes(self, max_num_nodes):
+        idx = []
+        for i, d in enumerate(self):
+            if d.num_nodes <= max_num_nodes:
+                idx.append(i)
+        dataset = self.__indexing__(idx)
+        print(f"Filtering out graphs larger than {max_num_nodes} yields a dataset with {len(dataset)}/{len(self)} samples remaining.")
+        return dataset
+
+    def process(self):
+        """Processes raw data and saves it into the `processed_dir`.
+        New implementation:
+            Here specifically it will collect all '*.ll.pickle' files recursively from subdirectories of `root`
+            and process the loaded nx graphs to Data.
+        Old implementation:
+            Instead of looking for .ll.pickle (nx graphs), we directly look for '*.data.p' files.
+        """
+        # check if we need to create the full dataset:
+        full_dataset = Path(self.processed_dir) / f'{self.split}_data.pt'
+        if full_dataset.is_file():
+            assert self.split == 'train', 'here shouldnt be reachable.'
+            print(f"Full dataset found. Generating train_subset={self.train_subset} with seed={self.train_subset_seed}")
+            # just get the split and save it
+            self.data, self.slices = torch.load(full_dataset)
+            self._save_train_subset()
+            print(f"Saved train_subset={self.train_subset} with seed={self.train_subset_seed} to disk.")
+            return
+
+        # ~~~~~ we need to create the full dataset ~~~~~~~~~~~
+        assert not full_dataset.is_file(), 'shouldnt be'
+        processed_path = str(full_dataset)
+
+        # read data into huge `Data` list.
+        data_list = []
+
+        ds_base = Path(self.root)
+        print(f'Creating {self.split} dataset at {str(ds_base)}')
+        # TODO change this line to go to the new format
+        #out_base = ds_base / ('ir_' + self.split + '_programl')
+        #assert out_base.exists(), f"{out_base} doesn't exist!"
+        # TODO collect .ll.pickle instead and call nx2data on the fly!
+        print(f"=== DATASET {str(ds_base)}: Collecting .data.p files into dataset")
+
+        #files = list(ds_base.rglob('*.data.p'))
+        files = list(ds_base.rglob('*.ll.pickle'))
+        
+        for file in tqdm.tqdm(files):
+            if not file.is_file():
+                continue
+            nx = load(file)
+            data = nx2data(nx)
+            data_list.append(data)
+
+        print(f" * COMPLETED * === DATASET {ds_base}: now pre-filtering...")
+
+        if self.pre_filter is not None:
+            data_list = [d for d in data_list if self.pre_filter(d)]
+        print(f" * COMPLETED * === DATASET {ds_base}: Completed filtering, now pre_transforming...")
+
+        if self.pre_transform is not None:
+            data_list = [self.pre_transform(d) for d in data_list]
+
+        print(f" * COMPLETED * === DATASET {ds_base}: saving to disk...")
+        self.data, self.slices = self.collate(data_list)
+        torch.save((self.data, self.slices), processed_path)
+
+        # maybe save train_subset as well
+        if not tuple(self.train_subset) == (0, 100) and self.split not in ['val', 'test']:
+            self._save_train_subset()
+
+
+
+
 class NCCDataset(InMemoryDataset):
-    def __init__(self, root, split, transform=None, pre_transform=None, train_subset=[0, 100], train_subset_seed=0):
+    def __init__(self, root='deeplearning/ml4pl/poj104/unsupervised_ncc_data',
+                 split='train',
+                 transform=None, pre_transform=None,
+                 train_subset=[0, 100],
+                 train_subset_seed=0):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
@@ -193,7 +334,10 @@ class NCCDataset(InMemoryDataset):
 
 
 class ThreadcoarseningDataset(InMemoryDataset):
-    def __init__(self, root, split, transform=None, pre_transform=None, train_subset=[0, 100], train_subset_seed=0):
+    def __init__(self, root='deeplearning/ml4pl/poj104/threadcoarsening_data',
+                 split='fail_fast',
+                 transform=None, pre_transform=None,
+                 train_subset=[0, 100], train_subset_seed=0):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
@@ -359,7 +503,9 @@ class ThreadcoarseningDataset(InMemoryDataset):
 
 
 class DevmapDataset(InMemoryDataset):
-    def __init__(self, root, split, transform=None, pre_transform=None, train_subset=[0, 100], train_subset_seed=0):
+    def __init__(self, root='deeplearning/ml4pl/poj104/devmap_data',
+                 split='fail', transform=None, pre_transform=None,
+                 train_subset=[0, 100], train_subset_seed=0):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
@@ -506,7 +652,10 @@ class DevmapDataset(InMemoryDataset):
 
 
 class POJ104Dataset(InMemoryDataset):
-    def __init__(self, root, split, transform=None, pre_transform=None, train_subset=[0, 100], train_subset_seed=0):
+    def __init__(self, root='deeplearning/ml4pl/poj104/classifyapp_data',
+                 split='fail',
+                 transform=None, pre_transform=None,
+                 train_subset=[0, 100], train_subset_seed=0):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).

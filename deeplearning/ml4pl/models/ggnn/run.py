@@ -8,7 +8,7 @@ Options:
                                         Will overwrite the per-dataset defaults if provided.
 
     --log_dir LOG_DIR               Directory(*) to store logfiles and trained models relative to repository dir.
-                                        [default: deeplearning/ml4pl/poj104/classifyapp_logs/]
+                                        [default: deeplearning/ml4pl/poj104/logs/unspecified]
     --model MODEL                   The model to run.
     --dataset DATASET               The dataset to us.
     --config CONFIG                 Path(*) to a config json dump with params.
@@ -144,7 +144,9 @@ class Learner(object):
         if self.args.get('--restore'):
             self.model = self.restore_model(path=REPO_ROOT / self.args['--restore'])
         elif self.args.get('--restore_by_pattern'):
-            self.model = self.restore_by_pattern(pattern=self.args['--restore_by_pattern'], log_dir=log_dir)
+            self.model = self.restore_by_pattern(pattern=self.args['--restore_by_pattern'],
+                                                 log_dir=log_dir,
+                                                 current_kfold_split=current_kfold_split)
         else: # initialize fresh model
             # get model and dataset
             assert model, "Need to provide --model to initialize freshly."
