@@ -44,3 +44,9 @@ deeplearning/ml4pl/poj104/devmap_data
 deeplearning/ml4pl/poj104/logs
 deeplearning/ml4pl/poj104/threadcoarsening_data
 deeplearning/ml4pl/poj104/unsupervised_ncc_data
+deeplearning/ml4pl/poj104/devmap_logs
+deeplearning/ml4pl/poj104/fresh_new_unsupervised_ncc_data
+deeplearning/ml4pl/poj104/threadcoarsening_logs
+deeplearning/ml4pl/poj104/unsupervised_ncc_logs
+deeplearning/ml4pl/poj104/new_unsupervised_ncc_data
+deeplearning/ml4pl/poj104/new_unsupervised_ncc_logs
