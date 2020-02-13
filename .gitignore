@@ -13,6 +13,11 @@ bazel-testlogs
 # Cache files
 **/__pycache__
 
+# 
+.vscode/settings.json
+deeplearning/ml4pl/poj104/branch_prediction_bin
+
+
 # Zach thesis stuff
 deeplearning/ml4pl/poj104/.ipynb_checkpoints/
 deeplearning/ml4pl/poj104/classifyapp_data
