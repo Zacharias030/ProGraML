@@ -357,14 +357,17 @@ class GraphTransformerEncoder(nn.Module):
 
         # Position Embeddings
         if getattr(config, 'position_embeddings', False):
-            # lookup the pos embs only once per batch instead of within every message layer:
-            self.register_buffer("position_embs",
-                PositionEmbeddings()(
-                    torch.arange(512, dtype=torch.get_default_dtype()),
-                    config.emb_size,
-                    dpad=getattr(config, 'selector_size', 0),
-                ),
-            )
+            self.selector_size = getattr(config, 'selector_size', 0)
+            self.emb_size = config.emb_size
+            # we are going to lookup the pos embs only once per batch instead of within every message layer
+            self.position_embs = PositionEmbeddings()
+            #self.register_buffer("position_embs",
+            #    PositionEmbeddings()(
+            #        torch.arange(512, dtype=torch.get_default_dtype()),
+            #        config.emb_size,
+            #        dpad=getattr(config, 'selector_size', 0),
+            #    ),
+            #)
         else:
             self.position_embs = None
 
@@ -395,7 +398,8 @@ class GraphTransformerEncoder(nn.Module):
         if getattr(self, 'position_embs') is not None:
             pos_emb_lists = []
             for i, pl in enumerate(pos_lists):
-                p_emb = torch.index_select(self.position_embs, dim=0, index=pl)
+                # p_emb = torch.index_select(self.position_embs, dim=0, index=pl)
+                p_emb = self.position_embs(pl.to(dtype=torch.get_default_dtype()), self.emb_size, dpad=self.selector_size)
                 pos_emb_lists.append(p_emb)
 
         # Prepare for backward edges
@@ -743,15 +747,20 @@ class GGNNMessageLayer(nn.Module):
         )
 
         self.pos_transform = None
-        if config.position_embeddings:
-            self.register_buffer(
-                "position_embs",
-                PositionEmbeddings()(
-                    torch.arange(512, dtype=torch.get_default_dtype()),
-                    config.emb_size,
-                    dpad=getattr(config, 'selector_size', 0),
-                ),
-            )
+        if getattr(config, 'position_embeddings', False):
+            self.selector_size = getattr(config, 'selector_size', 0)
+            self.emb_size = config.emb_size
+            self.position_embs = PositionEmbeddings()
+            
+            #legacy
+            #self.register_buffer(
+            #    "position_embs",
+            #    PositionEmbeddings()(
+            #        torch.arange(512, dtype=torch.get_default_dtype()),
+            #        config.emb_size,
+            #        dpad=getattr(config, 'selector_size', 0),
+            #    ),
+            #)
             self.pos_transform = LinearNet(
                 self.dim,
                 self.dim,
@@ -761,9 +770,6 @@ class GGNNMessageLayer(nn.Module):
 
     def forward(self, edge_lists, node_states, pos_lists=None):
         """edge_lists: [<M_i, 2>, ...]"""
-
-        if self.pos_transform:
-            pos_gating = 2 * torch.sigmoid(self.pos_transform(self.position_embs))
 
         # all edge types are handled in one matrix, but we
         # let propagated_states[i] be equal to the case with only edge_type i
@@ -792,10 +798,13 @@ class GGNNMessageLayer(nn.Module):
 
             if self.pos_transform:
                 pos_list = pos_lists[i]
-                #pos_by_source = F.embedding(pos_list, pos_gating)
-                pos_by_source = torch.index_select(pos_gating, dim=0, index=pos_list)
+                # torch.index_select(pos_gating, dim=0, index=pos_list)
+                pos_by_source = self.position_embs(pos_list.to(dtype=torch.get_default_dtype()), self.emb_size, dpad=self.selector_size)
+                
+                pos_gating_by_source = 2 * torch.sigmoid(self.pos_transform(pos_by_source))
+                
                 #messages_by_source.mul_(pos_by_source)
-                messages_by_source = messages_by_source * pos_by_source
+                messages_by_source = messages_by_source * pos_gating_by_source
 
             messages_by_targets.index_add_(0, edge_targets, messages_by_source)
 
@@ -1142,6 +1151,7 @@ class BetterAuxiliaryReadout(nn.Module):
             auxiliary_features.log1p_()
         aux_by_node = torch.index_select(auxiliary_features, dim=0, index=graph_nodes_list)
 
+        # TODO: here without batch normalization seems crazy!
         gate_input = torch.cat((raw_node_in, raw_node_out, aux_by_node), dim=-1)
         gating = torch.sigmoid(self.regression_gate(gate_input))
         trafo_input = torch.cat((raw_node_out, aux_by_node), dim=-1)

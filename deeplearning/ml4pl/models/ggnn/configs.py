@@ -246,3 +246,11 @@ class GraphTransformer_ForPretraining_Config(GraphTransformer_POJ104_Config):
         self.vocab_size = self.vocab_size + 1
         self.num_classes = self.vocab_size
         self.has_graph_labels: bool = False
+
+
+class GGNN_BranchPrediction_Config():
+    raise NotImplementedError
+
+
+class GraphTransformer_BranchPrediction_Config():
+    raise NotImplementedError

@@ -64,9 +64,11 @@ from deeplearning.ml4pl.models.ggnn.configs import (
     GGNN_ForPretraining_Config,
     GGNN_Devmap_Config,
     GGNN_Threadcoarsening_Config,
+    GGNN_BranchPrediction_Config,
     GraphTransformer_POJ104_Config,
     GraphTransformer_Devmap_Config,
     GraphTransformer_Threadcoarsening_Config,
+    GraphTransformer_BranchPrediction_Config,
     GraphTransformer_ForPretraining_Config,
 )
 
@@ -75,6 +77,7 @@ from deeplearning.ml4pl.poj104.dataset import (
     NCCDataset,
     ThreadcoarseningDataset,
     DevmapDataset,
+    BranchPredictionDataset,
 )
 
 # Importing twice like this enables restoring
@@ -100,22 +103,25 @@ MODEL_CLASSES = {
     'ggnn_poj104': (GGNNModel, GGNN_POJ104_Config),
     'ggnn_devmap': (GGNNModel, GGNN_Devmap_Config),
     'ggnn_threadcoarsening': (GGNNModel, GGNN_Threadcoarsening_Config),
+    'ggnn_branch_prediction': (GGNNModel, GGNN_BranchPrediction_Config),
     'ggnn_pretraining': (GGNNModel, GGNN_ForPretraining_Config),
     'transformer_poj104': (GraphTransformerModel, GraphTransformer_POJ104_Config),
     'transformer_devmap': (GraphTransformerModel, GraphTransformer_Devmap_Config),
     'transformer_threadcoarsening': (GraphTransformerModel, GraphTransformer_Threadcoarsening_Config),
+    'transformer_branch_prediction': (GraphTransformerModel, GraphTransformer_BranchPrediction_Config),
     'transformer_pretraining': (GraphTransformerModel, GraphTransformer_ForPretraining_Config),
 }
 
 DATASET_CLASSES = { #DS, default data_dir,
     'poj104': (POJ104Dataset, 'deeplearning/ml4pl/poj104/classifyapp_data'),
-    'ncc': (NCCDataset, 'deeplearning/ml4pl/poj104/unsupervised_ncc_data'),
+    'ncc': (NCCDataset, 'deeplearning/ml4pl/poj104/ncc_data'),
     'devmap_amd': (DevmapDataset, 'deeplearning/ml4pl/poj104/devmap_data'),
     'devmap_nvidia': (DevmapDataset, 'deeplearning/ml4pl/poj104/devmap_data'),
     'threadcoarsening_Cypress': (ThreadcoarseningDataset, 'deeplearning/ml4pl/poj104/threadcoarsening_data'),
     'threadcoarsening_Tahiti': (ThreadcoarseningDataset, 'deeplearning/ml4pl/poj104/threadcoarsening_data'),
     'threadcoarsening_Fermi': (ThreadcoarseningDataset, 'deeplearning/ml4pl/poj104/threadcoarsening_data'),
     'threadcoarsening_Kepler': (ThreadcoarseningDataset, 'deeplearning/ml4pl/poj104/threadcoarsening_data'),
+    'branch_prediction': (BranchPredictionDataset, 'deeplearning/ml4pl/poj104/branch_prediction_data'),
 }
 
 DEBUG = False
