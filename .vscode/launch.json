@@ -43,7 +43,7 @@
                 "--dataset", "devmap_amd",
                 "--kfold",
                 //"--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
-                "--log_dir", "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/transfer_ggnn/",
+                "--log_dir", "deeplearning/ml4pl/poj104/logs/debug_trash_folder/transfer_ggnn/",
                 "--config_json",
                 "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'num_epochs': 200, 'lr': 2.5e-4, 'vocab_size': 8569}",
                 "--transfer", "ggnn_devmap",
@@ -60,7 +60,7 @@
                 "--dataset", "devmap_amd",
                 "--kfold",
                 //"--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
-                "--log_dir", "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/transfer/",
+                "--log_dir", "deeplearning/ml4pl/poj104/logs/debug_trash_folder/transfer/",
                 "--config_json",
                 "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'num_epochs': 200, 'lr': 2.5e-4, 'vocab_size': 8569}",
                 "--transfer", "transformer_devmap",
@@ -76,8 +76,8 @@
             "args": [
                 "--model", "transformer_pretraining",
                 "--dataset", "ncc",
-                "--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
-                "--log_dir", "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                //"--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
+                "--log_dir", "deeplearning/ml4pl/poj104/logs/debug_trash_folder/ncc_pre",
                 "--config_json",
                 "{'train_subset': [0, 100], 'batch_size': 24, 'max_num_nodes': 30000, 'num_epochs': 160}",
             ]
@@ -90,7 +90,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--log_dir",
-                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "deeplearning/ml4pl/poj104/logs/debug_trash_folder/devmap_sup",
                 "--model",
                 "ggnn_devmap",
                 "--dataset",
@@ -108,7 +108,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--log_dir",
-                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "deeplearning/ml4pl/poj104/logs/debug_trash_folder/transformer_sup",
                 "--model",
                 "transformer_poj104",
                 "--dataset",
@@ -125,7 +125,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--log_dir",
-                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "deeplearning/ml4pl/poj104/logs/debug_trash_folder/ggnn_sup",
                 "--model",
                 "ggnn_poj104",
                 "--dataset",
@@ -143,10 +143,10 @@
             "args": [
                 "--model", "ggnn_pretraining",
                 "--dataset", "ncc",
-                "--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
-                "--log_dir", "deeplearning/ml4pl/poj104/classifyapp_logs/pretraining/",
+                //"--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
+                "--log_dir", "deeplearning/ml4pl/poj104/logs/debug_trash_folder/ggnn_pretraining/",
                 "--config_json",
-                "{'train_subset': [0, 100], 'batch_size': 32, 'max_num_nodes': 60000, 'num_epochs': 160}",
+                "{'train_subset': [0, 100], 'batch_size': 32, 'max_num_nodes': 30000, 'num_epochs': 160}",
             ]
         },
         {
@@ -176,7 +176,7 @@
                 "--restore_by_pattern",
                 "2020",
                 "--log_dir",
-                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "deeplearning/ml4pl/poj104/logs/debug_trash_folder/",
             ]
         },
         {
@@ -187,7 +187,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--log_dir",
-                "deeplearning/ml4pl/poj104/classifyapp_logs/debug_trash_folder/",
+                "deeplearning/ml4pl/poj104/logs/debug_trash_folder/",
                 "--config_json",
                 "{'use_node_types': True, 'backward_edges': True, 'batch_size': 64, 'clip_grad_norm': 0.0, 'edge_type_count': 3, 'edge_weight_dropout': 0.0, 'emb_size': 200, 'graph_state_dropout': 0.1, 'has_aux_input': False, 'has_graph_labels': True, 'hidden_size': 200, 'inst2vec_embeddings': 'none', 'layer_timesteps': [2, 2, 2], 'lr': 0.0005, 'msg_mean_aggregation': True, 'num_classes': 104, 'num_epochs': 150, 'output_dropout': 0.0, 'patience': 100, 'position_embeddings': True, 'random_seed': 42, 'selector_size': 0, 'train_subset': [0, 10], 'use_edge_bias': True, 'use_selector_embeddings': False, 'vocab_size': 8568}"
             ]

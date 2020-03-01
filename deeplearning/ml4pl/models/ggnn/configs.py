@@ -249,8 +249,10 @@ class GraphTransformer_ForPretraining_Config(GraphTransformer_POJ104_Config):
 
 
 class GGNN_BranchPrediction_Config():
-    raise NotImplementedError
+    def __init__(self):
+        raise NotImplementedError
 
 
 class GraphTransformer_BranchPrediction_Config():
-    raise NotImplementedError
+    def __init__(self):
+        raise NotImplementedError

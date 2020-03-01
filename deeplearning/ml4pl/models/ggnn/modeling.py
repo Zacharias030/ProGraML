@@ -831,7 +831,7 @@ class PositionEmbeddings(nn.Module):
                 position: 1d long Tensor of positions,
                 demb: int    size of embedding vector
             """
-        inv_freq = 1 / (10000 ** (torch.arange(0.0, demb, 2.0) / demb))
+        inv_freq = 1 / (10000 ** (torch.arange(0.0, demb, 2.0, device=positions.device) / demb))
 
         sinusoid_inp = torch.ger(positions, inv_freq)
         pos_emb = torch.cat(
