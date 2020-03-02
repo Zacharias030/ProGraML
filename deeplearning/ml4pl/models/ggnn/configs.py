@@ -87,7 +87,7 @@ class GGNN_POJ104_Config(ProGraMLBaseConfig):
         # currently only admits node types 0 and 1 for statements and identifiers.
         self.use_node_types = True
         self.use_edge_bias: bool = True
-        self.position_embeddings: bool = False
+        self.position_embeddings: bool = True
 
         # Aggregate by mean or by sum
         self.msg_mean_aggregation: bool = True

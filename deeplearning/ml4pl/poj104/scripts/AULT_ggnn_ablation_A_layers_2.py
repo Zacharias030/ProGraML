@@ -1,32 +1,39 @@
-"""transformer pretraining"""
 
 ########### Make your changes below the line ######################
 
 # subfolder under logs/
-subfolder = 'ncc_logs/transformer'
+subfolder = 'classifyapp_logs/ggnn_ablation_A'
 # choose 3 letters to identify your experiment
-jobname = ''
-model = 'transformer_pretraining' # 'ggnn_SET' or 'transformer_SET' or 'x_pretraining' (dataset without split!)
-dataset = 'ncc' # poj104, ncc, devmap_amd, _nvidia, threadcoarsening_Cypress, _Tahiti, _Fermi, _Kepler
+jobname = 'o2A'
+model = 'ggnn_poj104' # 'ggnn_SET' or 'transformer_SET' or 'x_pretraining' (dataset without split!)
+dataset = 'poj104' # poj104, ncc, devmap_amd, _nvidia, threadcoarsening_Cypress, _Tahiti, _Fermi, _Kepler
 kfold = '' # '' = no kfold
 transfer = ''
 # 4h runtime per submission
 resubmit_times_per_job = 5
 
-# a set of hyperparameters to grid search over
+
+# iterates over last item 'the quickest' and first item the slowest!
 choices_dict = {
-    'gnn_layers': [8,10,6],
+    'edge_weight_dropout': [0.0], #, 0.2],
+    #'layer_timesteps': [8*[1], 5*[2], 6*[1], 6*[2], 4*[2]],  # , [2,2,2,2], [1,1,1,1,1,1]],
+    'gnn_layers': [8, 10, 6, 4, 12],
     'update_weight_sharing': [2],
     'message_weight_sharing': [2],
-    #'output_dropout': [0.0, 0.2], #, 0.5],
-    'lr': [0.00025], #, [0.0005],
-    'batch_size': [64], #[32, 128],
-    #'edge_weight_dropout': [0.0, 0.1, 0.2],
-    #'graph_state_dropout': [0.1],  #[0.0, 0.05, 0.1, 0.2], #GGNN Update only!
-    #'use_better_aux': [True, False]
-    'num_epochs': [20],
-    'max_num_nodes': [80000],
+    'output_dropout': [0.0],  #, 0.2, 0.5],
+    'graph_state_dropout': [0.2],  #[0.0, 0.05, 0.1, 0.2],    
+    'batch_size': [128], #[32, 128],    
+    'lr': [0.00025],
+    'train_subset': [[0,100]],
+    'num_epochs': [16],
+    # binary choices:
+    #'msg_mean_aggregation': [True, False],
+    #'use_edge_bias': [True, False],
+    #'use_node_types': [True] #[False, True],
+    #'position_embeddings': [True, False],
     }
+
+
 
 
 ################ Make your changes above the line ################

@@ -1,12 +1,12 @@
-"""transformer pretraining"""
+"""ggnn ncc pretraining"""
 
 ########### Make your changes below the line ######################
 
 # subfolder under logs/
-subfolder = 'ncc_logs/transformer'
+subfolder = 'ncc_logs/ggnn_with_pos'
 # choose 3 letters to identify your experiment
-jobname = ''
-model = 'transformer_pretraining' # 'ggnn_SET' or 'transformer_SET' or 'x_pretraining' (dataset without split!)
+jobname = 'gPp'
+model = 'ggnn_pretraining' # 'ggnn_SET' or 'transformer_SET' or 'x_pretraining' (dataset without split!)
 dataset = 'ncc' # poj104, ncc, devmap_amd, _nvidia, threadcoarsening_Cypress, _Tahiti, _Fermi, _Kepler
 kfold = '' # '' = no kfold
 transfer = ''
@@ -15,7 +15,7 @@ resubmit_times_per_job = 5
 
 # a set of hyperparameters to grid search over
 choices_dict = {
-    'gnn_layers': [8,10,6],
+    'gnn_layers': [8],
     'update_weight_sharing': [2],
     'message_weight_sharing': [2],
     #'output_dropout': [0.0, 0.2], #, 0.5],
