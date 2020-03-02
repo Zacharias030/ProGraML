@@ -288,6 +288,29 @@ class Learner(object):
                             )
             self.test_data = None
 
+        # ~~~~~~~~~~~~ Branch Prediction ~~~~~~~~~~~~~~~~~~~~
+        elif dataset in ['branch_prediction']:
+            # train set
+            if not self.args.get('--test'):
+                # take train_subset=[90,100] as validation data
+                if self.config.train_subset == [0, 100]:
+                    print(f"!!!!!!!!  WARNING !!!!!!!!!!!!")
+                    print(f"SETTING TRAIN_SUBSET FROM [0,100] TO [0, 90]")
+                    print(f"!!!!!!!!  WARNING !!!!!!!!!!!!")
+                    self.config.train_subset = [0,90]
+                train_dataset = Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset)
+                train_dataset = train_dataset.filter_max_num_nodes(self.config.max_num_nodes)
+                self.train_data = NodeLimitedDataLoader(train_dataset,
+                                             batch_size=self.config.batch_size,
+                                             shuffle=True,
+                                             max_num_nodes=self.config.max_num_nodes,
+                                             warn_on_limit=True,
+                                            )
+            # valid set (and test set)
+            valid_dataset = Dataset(root=self.data_dir, split='train', train_subset=[90,100])
+            valid_dataset = valid_dataset.filter_max_num_nodes(self.config.max_num_nodes)
+            self.valid_data = DataLoader(valid_dataset, batch_size=self.config.batch_size * 2, shuffle=False)
+            self.test_data = None
         else:
             raise NotImplementedError
 
@@ -331,15 +354,9 @@ class Learner(object):
 
         # maybe add labels
         if batch.y is not None:
-            #TODO resolve this hack for poj104 which has classes from 1-104...
-            if self.args['--dataset'] == 'poj104':
-                inputs.update({
-                    "labels": batch.y - 1, # labels start at 0!!!
-             })
-            else:
-                inputs.update({
-                    "labels": batch.y,
-                })
+            inputs.update({
+                "labels": batch.y,
+            })
 
         # add other stuff
         if hasattr(batch, 'aux_in'):

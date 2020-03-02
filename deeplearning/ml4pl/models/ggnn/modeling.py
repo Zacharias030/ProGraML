@@ -975,6 +975,7 @@ class Readout(nn.Module):
         super().__init__()
         self.has_graph_labels = config.has_graph_labels
         self.num_classes = config.num_classes
+        self.use_tanh_readout = getattr(config, 'use_tanh_readout', False)
 
         self.regression_gate = LinearNet(
             2 * config.hidden_size, self.num_classes, dropout=config.output_dropout,
@@ -994,8 +995,11 @@ class Readout(nn.Module):
 
         gate_input = torch.cat((raw_node_in, raw_node_out), dim=-1)
         gating = torch.sigmoid(self.regression_gate(gate_input))
-        nodewise_readout = gating * self.regression_transform(raw_node_out)
-
+        if not self.use_tanh_readout:
+            nodewise_readout = gating * self.regression_transform(raw_node_out)
+        else:
+            nodewise_readout = gating * torch.tanh(self.regression_transform(raw_node_out))
+        
         graph_readout = None
         if self.has_graph_labels:
             assert graph_nodes_list is not None and num_graphs is not None, 'has_graph_labels requires graph_nodes_list and num_graphs tensors.'
@@ -1005,6 +1009,8 @@ class Readout(nn.Module):
             graph_readout.index_add_(
                 dim=0, index=graph_nodes_list, source=nodewise_readout
             )
+            if self.use_tanh_readout:
+                graph_readout = torch.tanh(graph_readout)
         return nodewise_readout, graph_readout
 
 
@@ -1295,13 +1301,15 @@ class NodeEmbeddingsWithSelectors(NodeEmbeddings):
 
 
 class Loss(nn.Module):
-    """[Binary] Cross Entropy loss with weighted intermediate loss"""
+    """Cross Entropy loss with weighted intermediate loss, and
+    L2 loss if num_classes is just 1.
+    """
 
     def __init__(self, config):
         super().__init__()
         self.config = config
         if config.num_classes == 1:
-            self.loss = nn.BCELoss()  # in: (N, *), target: (N, *)
+            self.loss = nn.MSELoss()  # in: (N, *), target: (N, *)
         else:
             # class labels '-1' don't contribute to the gradient!
             # however in most cases it will be more efficient to gather

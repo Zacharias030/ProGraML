@@ -250,9 +250,16 @@ class GraphTransformer_ForPretraining_Config(GraphTransformer_POJ104_Config):
 
 class GGNN_BranchPrediction_Config():
     def __init__(self):
+        self.batch_size = 4
+        self.use_tanh_readout = True
+        self.num_classes = 1
         raise NotImplementedError
 
 
 class GraphTransformer_BranchPrediction_Config():
     def __init__(self):
+        self.batch_size = 4
+        self.use_tanh_readout = True
+        self.num_classes = 1
+        
         raise NotImplementedError
