@@ -3,9 +3,9 @@
 ########### Make your changes below the line ######################
 
 # subfolder under classifyapp_logs/
-subfolder = 'poj104/transformer_ablation'
+subfolder = 'classifyapp_logs/transformer_ablation'
 # choose 3 letters to identify your experiment
-jobname = 'poj'
+jobname = 'toA'
 model = 'transformer_poj104' # 'ggnn_SET' or 'transformer_SET' or 'x_pretraining' (dataset without split!)
 dataset = 'poj104' # poj104, ncc, devmap_amd, _nvidia, threadcoarsening_Cypress, _Tahiti, _Fermi, _Kepler
 kfold = '' # '' = no kfold
@@ -15,12 +15,12 @@ resubmit_times_per_job = 5
 
 # a set of hyperparameters to grid search over
 choices_dict = {
-    'gnn_layers': [8,10,6],
+    'gnn_layers': [8,10,6,4],
     'update_weight_sharing': [2],
     'message_weight_sharing': [2],
-    'output_dropout': [0.0, 0.2], #, 0.5],
-    'lr': [0.00025, 0.0005],
-    'batch_size': [128, 64], #[32, 128],
+    'output_dropout': [0.0], #, 0.2], #, 0.5],
+    'lr': [0.00025, 0.0001],
+    'batch_size': [128,64], #[32, 128],
     #'edge_weight_dropout': [0.0, 0.1, 0.2],
     #'graph_state_dropout': [0.1],  #[0.0, 0.05, 0.1, 0.2], #GGNN Update only!
     #'use_better_aux': [True, False]
@@ -38,7 +38,7 @@ template = """#!/bin/bash
 #SBATCH --mail-type=ALL
 #SBATCH --cpus-per-task=8
 #SBATCH --mail-user=zacharias.vf@gmail.com
-#SBATCH --exclude=ault07,ault08,ault20,ault05,ault06
+#SBATCH --exclude=ault07,ault08,ault20
 #SBATCH --dependency=singleton
 
 source /users/zfisches/.bash_profile;
