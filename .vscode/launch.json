@@ -118,7 +118,7 @@
             ]
         },
         {
-            "name": "Python: run devmap supervised",
+            "name": "Python: run ggnn devmap supervised",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
@@ -132,6 +132,24 @@
                 "devmap_amd",
                 "--config_json",
                 "{'train_subset': [0, 100]}",
+                "--kfold",
+            ]
+        },
+        {
+            "name": "Python: run trfm devmap supervised",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--log_dir",
+                "deeplearning/ml4pl/poj104/logs/debug_trash_folder/devmap_supervised",
+                "--model",
+                "transformer_devmap",
+                "--dataset",
+                "devmap_amd",
+                "--config_json",
+                "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'batch_size': 32}",
                 "--kfold",
             ]
         },

@@ -8,16 +8,23 @@ import tqdm
 import torch
 
 
-def get_all_runs(log_dir, subfolders=False, exclude=['test_only'], upper_bound_epochs=None, fuse_by_name=False):
+def get_all_runs(log_dir, subfolders=False, exclude=['test_only'], upper_bound_epochs=None, fuse_by_name=False, silent=False):
     print(f"Getting all runs from {log_dir.name}")
     assert subfolders is False, 'not implemented'
     logs = {}
     hyps = {}
     for file in sorted(list(log_dir.glob('*_log.json'))):
         with open(file, 'r') as f:
-            
-            log = pd.read_json(f, orient='records')
-
+            try:
+                log = pd.read_json(f, orient='records')
+            except ValueError as e:
+                print(f'failing on {file}!')
+                try:
+                    jsondata = json.load(f)
+                    log = pd.DataFrame(jsondata)
+                except:
+                    continue
+                #raise e
             # handle 'test_only' epochs later!
             if log['epoch'].values[0] == 'test_only':
                 continue
@@ -26,8 +33,8 @@ def get_all_runs(log_dir, subfolders=False, exclude=['test_only'], upper_bound_e
         # skip weird files
         if run_name[:2] == '._':
             continue
-
-        print(run_name)
+        if not silent:
+            print(run_name)
         if fuse_by_name:
             short_run_name = run_name.rsplit('_', maxsplit=2)[1]
         else:
@@ -79,7 +86,8 @@ def get_all_runs(log_dir, subfolders=False, exclude=['test_only'], upper_bound_e
         if short_run_name not in logs:
             logs[short_run_name] = df
         else: #append!
-            print(f"fusing {run_name} with {short_run_name}")
+            if not silent:
+                print(f"fusing {run_name} with {short_run_name}")
             logs[short_run_name] = pd.concat([logs[short_run_name], df], axis=0)
     return logs, hyps
 
@@ -172,10 +180,20 @@ def annot_max(x, y, test_y, color='k', label=None, ax=None, invert_acc=True):
     ax.annotate(text, xy=(xargmax, ymax), xytext=(xmax + np.random.uniform(-xmax/1.5,xmax/2) , max((ymax - 0.951)*24 + 0.7, 0.91 + np.random.uniform(-0.01, 0.01))) , **kw)  # xytext=(xmax,0.90 + (np.random.rand() - 0.5) / 5)
 
 
-def plot_logs(logs, hyps, lower_ylim=0.85, display_list=None, legend_loc='best', plot_list='all', exclude_by_val_acc=False):
+def plot_logs(logs, hyps, lower_ylim=0.85, display_list=None, legend_loc='best', plot_list='all', exclude_by_val_acc=False, filter_props={}):
     plt.figure(figsize=(24, 12))
     #cycle_colors=iter(plt.cm.hsv(np.linspace(0,0.97,len(logs)))) #jet / hsv / rainbow
     cycle_colors = cycle(iter(plt.rcParams['axes.prop_cycle'].by_key()['color']))
+    _logs = {}
+    for name, log in logs.items():
+        take = True
+        for prop, values in filter_props.items():
+            if hyps[name][prop] not in values:
+                take = False
+        if take:
+            _logs[name] = log
+    logs = _logs
+    
     for name, log in logs.items():
         if exclude_by_val_acc and log['valid_acc'].max() < 0.96:
             continue
@@ -184,8 +202,8 @@ def plot_logs(logs, hyps, lower_ylim=0.85, display_list=None, legend_loc='best',
 
         if plot_list == 'all' or 'valid_acc' in plot_list:
             if hasattr(log, 'valid_acc'):
-                #label = make_label(name, 'valid')
-                plt.plot(log['epoch'].values, log['valid_acc'].values, ls='dashed', c=c, label='valid_acc')  # '_nolegend_',) # , 
+                label = make_label(name, 'valid',hyps, display_list)
+                plt.plot(log['epoch'].values, log['valid_acc'].values, ls='dashed', c=c, label=label.replace('\n', ' '))  # '_nolegend_',) # , 
 
         if plot_list == 'all' or 'train_acc' in plot_list:
             if hasattr(log, 'train_acc'):
@@ -211,26 +229,27 @@ def plot_logs(logs, hyps, lower_ylim=0.85, display_list=None, legend_loc='best',
     plt.show()
     
     # ~~~~~~~~~~~~ PPL PLOT ~~~~~~~~~~~~~~~~~~~~
-    plt.figure(figsize=(24, 12))
-    cycle_colors = cycle(iter(plt.rcParams['axes.prop_cycle'].by_key()['color']))
-    for name, log in logs.items():
-        c = next(cycle_colors) #next(color)
+    if plot_list == 'all' or any(['ppl' in x for x in plot_list]):
+        plt.figure(figsize=(24, 12))
+        cycle_colors = cycle(iter(plt.rcParams['axes.prop_cycle'].by_key()['color']))
+        for name, log in logs.items():
+            c = next(cycle_colors) #next(color)
 
-        if plot_list == 'all' or 'valid_ppl' in plot_list:
-            if hasattr(log, 'valid_ppl'):
-                label = make_label(name, 'valid_ppl', hyps, display_list=display_list)
-                plt.plot(log['epoch'].values, log['valid_ppl'].values, label=label.replace('\n','  ') ,c=c)
-            if hasattr(log, 'train_ppl'):
-                label = make_label(name, 'train_ppl', hyps, display_list=display_list)
-                plt.plot(log['epoch'].values, log['train_ppl'].values, label=label.replace('\n','  ') , ls='dotted', c=c)
+            if plot_list == 'all' or 'valid_ppl' in plot_list:
+                if hasattr(log, 'valid_ppl'):
+                    label = make_label(name, 'valid_ppl', hyps, display_list=display_list)
+                    plt.plot(log['epoch'].values, log['valid_ppl'].values, label=label.replace('\n','  ') ,c=c)
+                if hasattr(log, 'train_ppl'):
+                    label = make_label(name, 'train_ppl', hyps, display_list=display_list)
+                    plt.plot(log['epoch'].values, log['train_ppl'].values, label=label.replace('\n','  ') , ls='dotted', c=c)
 
-    plt.yticks(np.arange(1.0, 6.0, step=0.5))
-    plt.ylim((1.0, 2.0))
-    plt.grid(which='major', axis='x', c='grey')
-    plt.grid(which='minor', axis='y', c='silver', ls='--')
-    plt.grid(which='major', axis='y', c='black')
-    plt.minorticks_on()
-    if legend_loc is not None:
-        plt.legend(loc=legend_loc, prop={'family': 'monospace'})
+        plt.yticks(np.arange(1.0, 6.0, step=0.5))
+        plt.ylim((1.0, 2.0))
+        plt.grid(which='major', axis='x', c='grey')
+        plt.grid(which='minor', axis='y', c='silver', ls='--')
+        plt.grid(which='major', axis='y', c='black')
+        plt.minorticks_on()
+        if legend_loc is not None:
+            plt.legend(loc=legend_loc, prop={'family': 'monospace'})
 
-    plt.show()
+        plt.show()
