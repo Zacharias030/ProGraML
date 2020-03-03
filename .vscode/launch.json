@@ -33,6 +33,23 @@
             ]
         },
         {
+            "name": "Python: trfm transfer threadcoarsening",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset", "threadcoarsening_Tahiti",
+                "--kfold",
+                //"--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
+                "--log_dir", "deeplearning/ml4pl/poj104/logs/debug_trash_folder/transfer_threadcoarsening_transformer_tahiti/",
+                "--config_json",
+                "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'num_epochs': 6000, 'lr': 2.5e-4, 'vocab_size': 8569}",
+                "--transfer", "transformer_threadcoarsening",
+                "--restore", "deeplearning/ml4pl/poj104/logs/ault_logs_mirror/ncc_logs/transformer/2020-03-02_04:12:31_000_31632_model_best.pickle",
+            ]
+        },
+        {
             "name": "Python: run threadcoarsening supervised",
             "type": "python",
             "request": "launch",
@@ -78,9 +95,9 @@
                 "--dataset", "devmap_amd",
                 "--kfold",
                 //"--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
-                "--log_dir", "deeplearning/ml4pl/poj104/logs/debug_trash_folder/transfer_devmap_transformer2/",
+                "--log_dir", "deeplearning/ml4pl/poj104/logs/debug_trash_folder/transfer_devmap_transformer3/",
                 "--config_json",
-                "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'num_epochs': 1000, 'lr': 2.5e-4, 'vocab_size': 8569}",
+                "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'num_epochs': 1000, 'lr': 2.5e-4, 'vocab_size': 8569, 'use_better_aux': True}",
                 "--transfer", "transformer_devmap",
                 "--restore", "deeplearning/ml4pl/poj104/logs/ault_logs_mirror/ncc_logs/transformer/2020-03-02_04:12:31_000_31632_model_best.pickle",
             ]

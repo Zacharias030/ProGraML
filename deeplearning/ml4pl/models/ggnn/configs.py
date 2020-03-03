@@ -205,7 +205,7 @@ class GraphTransformer_Devmap_Config(GraphTransformer_POJ104_Config):
         # change default
         self.batch_size = 64
         self.lr = 2.5e-4
-        self.num_epochs = 150
+        self.num_epochs = 600
         #self.graph_state_dropout = 0.0 #GGNN only
         
         #self.output_dropout # <- applies to Readout func!
@@ -225,7 +225,8 @@ class GraphTransformer_Devmap_Config(GraphTransformer_POJ104_Config):
 class GraphTransformer_Threadcoarsening_Config(GraphTransformer_POJ104_Config):
     def __init__(self):
         super().__init__()
-        self.lr = 5e-5
+        self.lr = 5e-5 #2.5-4?
+        self.num_epochs = 600
         # Dataset inherent, don't change!
         self.num_classes: int = 6
         self.has_graph_labels: bool = True
