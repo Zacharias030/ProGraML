@@ -45,6 +45,7 @@ cd /users/zfisches/ProGraML;
 
 srun python deeplearning/ml4pl/models/ggnn/run.py \
 --dataset={dataset} \
+--model={model} \
 {kfold} \
 {transfer} \
 --log_dir=deeplearning/ml4pl/poj104/logs/{subfolder}/ \
