@@ -196,7 +196,7 @@ def plot_logs(logs, hyps, lower_ylim=0.85, display_list=None, legend_loc='best',
             if hasattr(log, 'test_acc'):
                 label = make_label(name, 'test', hyps, display_list=display_list)
                 plt.plot(log['epoch'].values, log['test_acc'].values, label=label.replace('\n', '  '), c=c)
-                annot_max(x=log['epoch'].values, y=log['valid_acc'].values or None, test_y=log['test_acc'].values, color=c, label=label)
+                annot_max(x=log['epoch'].values, y=log['valid_acc'].values, test_y=log['test_acc'].values, color=c, label=label)
 
 
     plt.yticks(np.arange(0, 1, step=0.05))

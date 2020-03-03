@@ -248,18 +248,19 @@ class GraphTransformer_ForPretraining_Config(GraphTransformer_POJ104_Config):
         self.has_graph_labels: bool = False
 
 
-class GGNN_BranchPrediction_Config():
+class GGNN_BranchPrediction_Config(GGNN_POJ104_Config):
     def __init__(self):
+        super().__init__()
         self.batch_size = 4
-        self.use_tanh_readout = True
+        #self.use_tanh_readout = False !
         self.num_classes = 1
-        raise NotImplementedError
+        self.has_graph_labels = False
 
 
-class GraphTransformer_BranchPrediction_Config():
+class GraphTransformer_BranchPrediction_Config(GraphTransformer_POJ104_Config):
     def __init__(self):
+        super().__init__()
         self.batch_size = 4
-        self.use_tanh_readout = True
+        #self.use_tanh_readout = False !
         self.num_classes = 1
-        
-        raise NotImplementedError
+        self.has_graph_labels = False

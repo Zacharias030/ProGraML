@@ -1309,7 +1309,9 @@ class Loss(nn.Module):
         super().__init__()
         self.config = config
         if config.num_classes == 1:
-            self.loss = nn.MSELoss()  # in: (N, *), target: (N, *)
+            # self.loss = nn.BCEWithLogitsLoss()  # in: (N, *), target: (N, *)
+            self.loss = nn.MSELoss()
+            # self.loss = nn.L1Loss()
         else:
             # class labels '-1' don't contribute to the gradient!
             # however in most cases it will be more efficient to gather
@@ -1324,7 +1326,10 @@ class Loss(nn.Module):
 
     def forward(self, logits, targets):
         """inputs: (logits) or (logits, intermediate_logits)"""
-        loss = self.loss(logits[0], targets)
+        if self.config.num_classes == 1:
+            l = torch.sigmoid(logits[0])
+            logits = (l, logits[1])
+        loss = self.loss(logits[0].squeeze(dim=1), targets)
         if getattr(self.config, 'has_aux_input', False):
             loss = loss + self.config.intermediate_loss_weight * self.loss(
                 logits[1], targets

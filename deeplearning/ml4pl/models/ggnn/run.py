@@ -290,27 +290,27 @@ class Learner(object):
 
         # ~~~~~~~~~~~~ Branch Prediction ~~~~~~~~~~~~~~~~~~~~
         elif dataset in ['branch_prediction']:
+            assert kfold and current_kfold_split is not None, "Devmap only supported with kfold flag!"
+            assert current_kfold_split < 10
             # train set
-            if not self.args.get('--test'):
-                # take train_subset=[90,100] as validation data
-                if self.config.train_subset == [0, 100]:
-                    print(f"!!!!!!!!  WARNING !!!!!!!!!!!!")
-                    print(f"SETTING TRAIN_SUBSET FROM [0,100] TO [0, 90]")
-                    print(f"!!!!!!!!  WARNING !!!!!!!!!!!!")
-                    self.config.train_subset = [0,90]
-                train_dataset = Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset)
-                train_dataset = train_dataset.filter_max_num_nodes(self.config.max_num_nodes)
-                self.train_data = NodeLimitedDataLoader(train_dataset,
-                                             batch_size=self.config.batch_size,
-                                             shuffle=True,
-                                             max_num_nodes=self.config.max_num_nodes,
-                                             warn_on_limit=True,
-                                            )
+            ds = Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset)
+            
+            train_dataset, valid_dataset = ds.return_cross_validation_splits(current_kfold_split)
+            train_dataset.filter_max_num_nodes(self.config.max_num_nodes)
+            valid_dataset.filter_max_num_nodes(self.config.max_num_nodes)
+            self.train_data = NodeLimitedDataLoader(train_dataset,
+                    batch_size=self.config.batch_size,
+                    shuffle=True,
+                    max_num_nodes=self.config.max_num_nodes,
+                    warn_on_limit=True,
+            )
             # valid set (and test set)
             valid_dataset = Dataset(root=self.data_dir, split='train', train_subset=[90,100])
             valid_dataset = valid_dataset.filter_max_num_nodes(self.config.max_num_nodes)
-            self.valid_data = DataLoader(valid_dataset, batch_size=self.config.batch_size * 2, shuffle=False)
+            self.valid_data = DataLoader(valid_dataset, batch_size=self.config.batch_size, shuffle=False)
+            
             self.test_data = None
+        # ~~~~~~~~~~~ Unknow Dataset ~~~~~~~~~~~~~~~~~
         else:
             raise NotImplementedError
 
@@ -368,6 +368,19 @@ class Learner(object):
                 "runtimes": batch.runtimes.to(dtype=torch.float)
             })
         return inputs
+    
+    def make_branch_labels(self, batch):
+        """takes a batch and maps the profile info to branch labels for regression:
+        a branch has (true_weight+1, false_weight+1, total_weight+2) and we map to [0, 1] as
+                p(true) = true_weight / total_weight
+        note that the profile info adds 1 on both true and false weights!
+        """
+        mask = batch.profile_info[:, 0]
+        # clamp to be robust against 0 counts from problems with the data
+        yes = torch.clamp(batch.profile_info[:,1].to(dtype=torch.get_default_dtype()) - 1, min=0.0)
+        total = 1e-7 + torch.clamp(batch.profile_info[:,3].to(torch.get_default_dtype()) - 2, min=0.0)
+        p_yes = yes / total# true / total
+        return p_yes, mask
 
     def bertify_batch(self, batch, config):
         """takes a batch and returns the bertified input, labels and corresponding mask,
@@ -442,9 +455,16 @@ class Learner(object):
                     'readout_mask': mlm_target_mask,
                 })
                 num_targets = torch.sum(mlm_target_mask.to(torch.long)).item()
+            elif self.config.name in ['GGNN_BranchPrediction_Config', 'GraphTransformer_BranchPrediction_Config']:
+                y, mask = self.make_branch_labels(batch)
+                inputs.update({
+                    'labels': y,
+                    'readout_mask': mask,
+                })
+                num_targets = torch.sum(mask.to(torch.long)).item()
+            # elif: other nodewise configs go here!
             elif getattr(self.config, 'has_graph_labels', False): # all graph models
                 num_targets = num_graphs
-            # TODO: elif: other nodewise configs go here!
             else:
                 raise NotImplementedError("We don't have other nodewise models currently.")
 
@@ -495,8 +515,8 @@ class Learner(object):
                 self.model.opt.zero_grad()
 
             # update bar display
-            bar_loss = epoch_loss / predicted_targets
-            bar_acc = epoch_accuracy / predicted_targets
+            bar_loss = epoch_loss / (predicted_targets + 1e-8)
+            bar_acc = epoch_accuracy / (predicted_targets + 1e-8)
             bar.set_postfix(loss=bar_loss, acc=bar_acc, ppl=np.exp(bar_loss))
             bar.update(num_graphs)
 
