@@ -33,13 +33,16 @@ def config_generator(choices_dict, model):
     configs = list(itertools.product(*value_list))
     for c in configs:
         manual_choices = dict(zip(choices_dict.keys(), c))
-        Config = MODEL_CLASSES[model][1]
-        config_dict = Config.from_dict(manual_choices).to_dict()
+        if model is not None:
+            Config = MODEL_CLASSES[model][1]
+            config_dict = Config.from_dict(manual_choices).to_dict()
+        else: # for transfer learning
+            config_dict = manual_choices
         yield config_dict
 
 
 def write_runscripts(subfolder, template, choices_dict, jobname, steps,
-                     model, dataset, kfold, transfer):
+                     dataset, kfold, model=None, transfer=None, restore=None):
     configs = list(config_generator(choices_dict, model))
     outpath = SCRIPTS_FOLDER / subfolder
     outpath.mkdir(exist_ok = True, parents=True)
@@ -69,11 +72,15 @@ def write_runscripts(subfolder, template, choices_dict, jobname, steps,
                 "subfolder": subfolder,
                 "jobname": jobname,
                 "restore_by_pattern": resto_str,
-                "model": model,
                 "dataset": dataset,
                 "kfold": kfold,
                 "transfer": transfer,
                 }
+            if model is not None:
+                template_format.update({'model': model})
+
+            if restore is not None:
+                template_format.update({'restore': restore})
 
             runscript = template.format(**template_format)
             #print(runscript)

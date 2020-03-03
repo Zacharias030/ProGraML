@@ -1157,7 +1157,7 @@ class BetterAuxiliaryReadout(nn.Module):
             auxiliary_features.log1p_()
         aux_by_node = torch.index_select(auxiliary_features, dim=0, index=graph_nodes_list)
 
-        # TODO: here without batch normalization seems crazy!
+        # info: the gate and regression include batch norm inside!
         gate_input = torch.cat((raw_node_in, raw_node_out, aux_by_node), dim=-1)
         gating = torch.sigmoid(self.regression_gate(gate_input))
         trafo_input = torch.cat((raw_node_out, aux_by_node), dim=-1)
