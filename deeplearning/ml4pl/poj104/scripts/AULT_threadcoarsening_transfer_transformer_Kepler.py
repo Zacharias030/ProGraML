@@ -19,7 +19,8 @@ resubmit_times_per_job = 1
 # a set of hyperparameters to grid search over
 choices_dict = {
     'lr': [0.00025, 5e-5],
-    'output_dropout': [0.0, 0.2], #, 0.5],
+    'batch_size': [128, 8, 4],
+    'output_dropout': [0.0, 0.1, 0.2], #, 0.5],
     'num_epochs': [600],
     'vocab_size': [8569],
     }
