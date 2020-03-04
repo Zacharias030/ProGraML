@@ -378,6 +378,7 @@ class Learner(object):
         yes = torch.clamp(batch.profile_info[:,1].to(dtype=torch.get_default_dtype()) - 1, min=0.0)
         total = 1e-7 + torch.clamp(batch.profile_info[:,3].to(torch.get_default_dtype()) - 2, min=0.0)
         p_yes = yes / total# true / total
+        p_yes = torch.clamp(p_yes, min=0.0, max=1.0)
         # print([str(a) for a in p_yes[mask].clone().detach().to('cpu').numpy()])
         return p_yes, mask
 
