@@ -1,6 +1,7 @@
 # better dataloader
 from pathlib import Path
 import pickle
+import math
 
 import tqdm
 import numpy as np
@@ -637,7 +638,11 @@ class ThreadcoarseningDataset(InMemoryDataset):
             for cf in [1, 2, 4, 8, 16, 32]:
                 row = df[(df['kernel'] == kernel) & (df['cf'] == cf)]
                 if len(row) == 1:
-                    kernel_r.append(float(row[f'runtime_{platform}'].values))
+                    value = float(row[f'runtime_{platform}'].values)
+                    if math.isnan(value):
+                        print(f"WARNING: Dataset contain NaN value (missing entry in runtimes most likely). kernel={kernel}, cf={cf}, value={row}.Replacing by infinity!.")
+                        value = float('inf')
+                    kernel_r.append(value)
                 elif len(row) == 0:
                     print(f' kernel={kernel:>20} is missing cf={cf}. Ad-hoc inserting result from last existing coarsening factor.')
                     kernel_r.append(kernel_r[-1])
@@ -680,7 +685,7 @@ class ThreadcoarseningDataset(InMemoryDataset):
 
         # sanity check oracles against min runtimes
         for i, (k, v) in enumerate(runtimes.items()):
-            assert int(y[i]) == np.argmin(v)
+            assert int(y[i]) == np.argmin(v), f"{i}: {k} {v}, argmin(v): {np.argmin(v)} vs. oracles data {int(y[i])}."
 
         # Add attributes to graphs
         data_list = []
@@ -1114,6 +1119,11 @@ class LegacyPOJ104Dataset(InMemoryDataset):
             self._save_train_subset()
 
 
-#if __name__ == '__main__':
-#    d = NewNCCDataset()
-#    print(d.data)
+if __name__ == '__main__':
+    #d = NewNCCDataset()
+    #print(d.data)
+    root = '/home/zacharias/llvm_datasets/threadcoarsening_data/'
+    a = ThreadcoarseningDataset(root, 'Cypress')
+    b = ThreadcoarseningDataset(root, 'Tahiti')
+    c = ThreadcoarseningDataset(root, 'Fermi')
+    d = ThreadcoarseningDataset(root, 'Kepler')
