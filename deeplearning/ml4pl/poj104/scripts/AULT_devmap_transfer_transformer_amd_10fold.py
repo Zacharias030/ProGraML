@@ -18,7 +18,7 @@ resubmit_times_per_job = 1
 
 # a set of hyperparameters to grid search over
 choices_dict = {
-    'random_seed': [42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52],
+    'random_seed': [42, 43, 44, 45, 46, 47, 48, 49, 50, 51],
     'lr': [0.00025],
     'output_dropout': [0.0], #, 0.5],
     'aux_use_better': [True],
