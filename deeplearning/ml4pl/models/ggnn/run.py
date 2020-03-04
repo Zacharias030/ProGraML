@@ -290,23 +290,21 @@ class Learner(object):
 
         # ~~~~~~~~~~~~ Branch Prediction ~~~~~~~~~~~~~~~~~~~~
         elif dataset in ['branch_prediction']:
-            assert kfold and current_kfold_split is not None, "Devmap only supported with kfold flag!"
+            assert kfold and current_kfold_split is not None, "Branch Prediction only supported with kfold flag!"
             assert current_kfold_split < 10
             # train set
             ds = Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset)
+            ds = ds.filter_max_num_nodes(self.config.max_num_nodes)
             
             train_dataset, valid_dataset = ds.return_cross_validation_splits(current_kfold_split)
-            train_dataset.filter_max_num_nodes(self.config.max_num_nodes)
-            valid_dataset.filter_max_num_nodes(self.config.max_num_nodes)
+            #train_dataset.filter_max_num_nodes(self.config.max_num_nodes)
+            #valid_dataset.filter_max_num_nodes(self.config.max_num_nodes)
             self.train_data = NodeLimitedDataLoader(train_dataset,
                     batch_size=self.config.batch_size,
                     shuffle=True,
                     max_num_nodes=self.config.max_num_nodes,
-                    warn_on_limit=True,
+                    warn_on_limit=False,
             )
-            # valid set (and test set)
-            valid_dataset = Dataset(root=self.data_dir, split='train', train_subset=[90,100])
-            valid_dataset = valid_dataset.filter_max_num_nodes(self.config.max_num_nodes)
             self.valid_data = DataLoader(valid_dataset, batch_size=self.config.batch_size, shuffle=False)
             
             self.test_data = None
@@ -375,11 +373,12 @@ class Learner(object):
                 p(true) = true_weight / total_weight
         note that the profile info adds 1 on both true and false weights!
         """
-        mask = batch.profile_info[:, 0]
+        mask = batch.profile_info[:, 0].bool()
         # clamp to be robust against 0 counts from problems with the data
         yes = torch.clamp(batch.profile_info[:,1].to(dtype=torch.get_default_dtype()) - 1, min=0.0)
         total = 1e-7 + torch.clamp(batch.profile_info[:,3].to(torch.get_default_dtype()) - 2, min=0.0)
         p_yes = yes / total# true / total
+        # print([str(a) for a in p_yes[mask].clone().detach().to('cpu').numpy()])
         return p_yes, mask
 
     def bertify_batch(self, batch, config):
@@ -461,6 +460,9 @@ class Learner(object):
                     'labels': y,
                     'readout_mask': mask,
                 })
+                if not torch.any(mask):
+                    print('Warning: batch has no labels! skipping.......')
+                    continue
                 num_targets = torch.sum(mask.to(torch.long)).item()
             # elif: other nodewise configs go here!
             elif getattr(self.config, 'has_graph_labels', False): # all graph models
@@ -781,6 +783,7 @@ if __name__ == '__main__':
     else:  # kfold
         if args['--dataset'] in ['devmap_amd', 'devmap_nvidia']: num_splits = 10
         elif args['--dataset'] in ['threadcoarsening_Cypress', 'threadcoarsening_Kepler', 'threadcoarsening_Fermi', 'threadcoarsening_Tahiti']: num_splits = 17
+        elif args['--dataset'] in ['branch_prediction']: num_splits = 10
         else: raise NotImplementedError("kfold not implemented for this dataset.")
 
         for split in range(num_splits):
@@ -788,4 +791,8 @@ if __name__ == '__main__':
             print(f"CURRENT SPLIT: {split} + 1/{num_splits}")
             print(f"#######################################")
             learner = Learner(model=args['--model'], dataset=args['--dataset'], args=args, current_kfold_split=split)
+            if len(learner.valid_data) == 0:
+                print('***'*20)
+                print(f'Validation Split is empty! Skipping split {split} + 1 / {num_splits}.')
+                print('***'*20)
             learner.test() if args.get('--test') else learner.train()

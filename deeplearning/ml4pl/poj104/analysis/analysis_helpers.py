@@ -36,7 +36,13 @@ def get_all_runs(log_dir, subfolders=False, exclude=['test_only'], upper_bound_e
         if not silent:
             print(run_name)
         if fuse_by_name:
-            short_run_name = run_name.rsplit('_', maxsplit=2)[1]
+            # check if we are in kfold mode
+            if len(run_name.rsplit('_', maxsplit=1)[-1]) <= 2:
+                splits = run_name.rsplit('_', maxsplit=3)
+                short_run_name = splits[1] + '_' + splits[3]
+            else:
+                short_run_name = run_name.rsplit('_', maxsplit=2)[1]
+
         else:
             short_run_name = run_name
 

@@ -15,7 +15,24 @@
         // configs below this line!
         //"justMyCode": false,
         {
-            "name": "Python: run branch_pred transformer supervised",
+            "name": "Python: trfm transfer branch_pred",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset", "branch_prediction",
+                "--kfold",
+                //"--data_dir", "/mnt/data/llvm/master_thesis_datasets/old_unsupervised_ncc_data",
+                "--log_dir", "deeplearning/ml4pl/poj104/logs/debug_trash_folder/transfer_branch_prediction/",
+                "--config_json",
+                "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'num_epochs': 600, 'lr': 2.5e-4, 'vocab_size': 8569, 'batch_size': 4}",
+                "--transfer", "transformer_branch_prediction",
+                "--restore", "deeplearning/ml4pl/poj104/logs/ault_logs_mirror/ncc_logs/transformer/2020-03-02_04:12:31_000_31632_model_best.pickle",
+            ]
+        },
+        {
+            "name": "Python: trfm supervised branch_pred",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
@@ -23,13 +40,14 @@
             //"justMyCode": false,
             "args": [
                 "--log_dir",
-                "deeplearning/ml4pl/poj104/logs/debug_trash_folder/",
+                "deeplearning/ml4pl/poj104/logs/debug_trash_folder/branch_pred_trash",
                 "--model",
                 "transformer_branch_prediction",
+                "--kfold",
                 "--dataset",
                 "branch_prediction",
                 "--config_json",
-                "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'batch_size': 4, 'num_epochs': 300, 'lr': 0.0}",
+                "{'train_subset': [0, 100], 'max_num_nodes': 30000, 'batch_size': 4, 'num_epochs': 10, 'lr': 2.5e-4}",
             ]
         },
         {

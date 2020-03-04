@@ -113,6 +113,7 @@ class BaseGNNModel(nn.Module):
 
 
         if readout_mask is not None:  # need to mask labels in the same fashion.
+            assert readout_mask.dtype == torch.bool, 'Readout mask should be boolean!'
             labels = labels[readout_mask]
 
         # Metrics

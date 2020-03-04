@@ -80,6 +80,7 @@ class NodeLimitedDataLoader(torch.utils.data.DataLoader):
                     if len(limited_batch) < len(batch):
                         if warn_on_limit:
                             print(f"dropped {len(batch) - len(limited_batch)} graphs from batch!")
+                    assert limited_batch != [], f'limited batch is empty! original batch was {batch}'
                     return Batch.from_data_list(limited_batch, follow_batch)
                 else:
                     return Batch.from_data_list(batch, follow_batch)

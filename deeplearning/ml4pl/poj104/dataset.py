@@ -6,7 +6,7 @@ import tqdm
 import numpy as np
 import pandas as pd
 import networkx as nx
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, KFold
 import torch
 from torch_geometric.data import InMemoryDataset, Data
 
@@ -137,6 +137,7 @@ class BranchPredictionDataset(InMemoryDataset):
 
         assert split in ['train'], "The BranchPrediction dataset only has a 'train' split. use train_subset=[0,x] and [x, 100] for training and testing."
         self.data, self.slices = torch.load(self.processed_paths[0])
+        pass
 
     @property
     def raw_file_names(self):
@@ -177,6 +178,19 @@ class BranchPredictionDataset(InMemoryDataset):
         data, slices = dataset.data, dataset.slices
         torch.save((data, slices), self.processed_paths[0])
         return
+
+    def return_cross_validation_splits(self, split):
+        assert self.train_subset == [0, 100], "Do cross-validation on the whole dataset!"
+        #num_samples = len(self)
+        #perm = np.random.RandomState(self.train_subset_seed).permutation(len(self))
+
+         # 10-fold cross-validation
+        n_splits = 10
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+        (train_index, test_index) = list(kf.split(range(len(self))))[split]
+        train_data = self.__indexing__(train_index)
+        test_data = self.__indexing__(test_index)
+        return train_data, test_data
 
     def filter_max_num_nodes(self, max_num_nodes):
         idx = []
