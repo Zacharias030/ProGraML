@@ -1,16 +1,16 @@
-"""transformer threadcoarsening transfer"""
+"""transformer branch prediction transfer"""
 
 ########### Make your changes below the line ######################
 
 # subfolder under classifyapp_logs/
-subfolder = 'threadcoarsening_logs/transformer_transfer_Tahiti_2'
+subfolder = 'branch_prediction_logs/transformer_transfer_random'
 # choose 3 letters to identify your experiment
-jobname = 'ctT'
+jobname = 'brt'
 
 model = None #'devmap_poj104' # 'ggnn_SET' or 'transformer_SET' or 'x_pretraining' (dataset without split!)
-dataset = 'threadcoarsening_Tahiti' # poj104, ncc, devmap_amd, _nvidia, threadcoarsening_Cypress, _Tahiti, _Fermi, _Kepler
+dataset = 'branch_prediction' # poj104, ncc, devmap_amd, _nvidia, threadcoarsening_Cypress, _Tahiti, _Fermi, _Kepler
 kfold = '--kfold' # '' = no kfold, '--kfold' for kfold.
-transfer = '--transfer=transformer_threadcoarsening' # '' for no transfer, '--transfer=transformer_devmap'
+transfer = '--transfer=transformer_branch_prediction' # '' for no transfer, '--transfer=transformer_devmap'
 restore = "--restore=deeplearning/ml4pl/poj104/logs/ncc_logs/transformer/2020-03-02_04:12:31_000_31632_model_best.pickle"
 
 # 4h runtime per submission
@@ -18,11 +18,12 @@ resubmit_times_per_job = 1
 
 # a set of hyperparameters to grid search over
 choices_dict = {
-    'random_seed': [43],
-    'lr': [0.00025, 5e-5],
-    'batch_size': [128, 8, 4],
-    'output_dropout': [0.0, 0.1, 0.2], #, 0.5],
-    'num_epochs': [600],
+    'random_seed': [42],  # , 43, 44, 45, 46],
+    'lr': [0.00],
+    'batch_size': [4],
+    'max_num_nodes': [80000],
+    'output_dropout': [0.0], #, 0.5],
+    'num_epochs': [10],
     'vocab_size': [8569],
     }
 
