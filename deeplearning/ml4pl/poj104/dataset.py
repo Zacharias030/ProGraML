@@ -11,6 +11,11 @@ from sklearn.model_selection import StratifiedKFold, KFold
 import torch
 from torch_geometric.data import InMemoryDataset, Data
 
+import csv
+from pathlib import Path
+from typing import Dict, Optional
+from programl.proto.program_graph_pb2 import ProgramGraph
+
 
 # make this file executable from anywhere
 
@@ -24,56 +29,62 @@ sys.path.insert(1, REPO_ROOT)
 REPO_ROOT = Path(REPO_ROOT)
 
 
-def load(file):
+# The vocabulary file used in the dataflow experiments.
+PROGRAML_VOCABULARY = Path("deeplearning/ml4pl/poj104/programl_vocabulary.csv")
+assert PROGRAML_VOCABULARY.is_file()
+
+
+def load(file: str) -> ProgramGraph:
+    """Read a ProgramGraph protocol buffer from file."""
+    graph = ProgramGraph()
     with open(file, 'rb') as f:
-        try:
-            data = pickle.load(f)
-        except EOFError as e:
-            print(f"Failing on {str(file)}")
-            raise e
-    return data
+        graph.ParseFromString(f.read())
+    return graph
 
 
-def nx2data(nx_graph, class_label=None, ignore_profile_info=True):
-    r"""Converts a :obj:`networkx.Graph` or :obj:`networkx.DiGraph` to a
+def load_vocabulary(path: Path):
+    """Read the vocabulary file used in the dataflow experiments."""
+    vocab = {}
+    with open(path) as f:
+        vocab_file = csv.reader(f.readlines(), delimiter="\t")
+        for i, row in enumerate(vocab_file, start=-1):
+            if i == -1:  # Skip the header.
+                continue
+            (_, _, _, text) = row
+            vocab[text] = i
+
+    return vocab
+
+
+def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
+            y_feature_name: Optional[str] = None,
+            ignore_profile_info=True):
+    r"""Converts a program graph protocol buffer to a
     :class:`torch_geometric.data.Data` instance.
 
     Args:
-        G               (networkx.Graph or networkx.DiGraph): A networkx graph.
-        class_label     optional 'y' label. Should be int [0, ..., num_classes - 1]
+        graph           A program graph protocol buffer.
+        vocabulary      A map from node text to vocabulary indices.
+        y_feature_name  The name of the graph-level feature to use as class label.
     """
 
     # collect edge_index
-    edge_index = torch.tensor(list(nx_graph.edges())).t().contiguous()
+    edge_tuples = [(edge.source, edge.target) for edge in graph.edge]
+    edge_index = torch.tensor(edge_tuples).t().contiguous()
 
     # collect edge_attr
-    positions = []
-    flows = []
-
-    for i, (_, _, edge_data) in enumerate(nx_graph.edges(data=True)):
-        flows.append(edge_data['flow'])
-        # TODO(remove): this hack fixes a bug where call edges have position info!
-        # depends on merge of this fix https://github.com/ChrisCummins/phd/pull/106
-        if edge_data['flow'] == 2:
-            positions.append(0)
-        else:
-            positions.append(edge_data['position'])
-
-    positions = torch.tensor(positions)
-    flows = torch.tensor(flows)
+    positions = torch.tensor([edge.position for edge in graph.edge])
+    flows = torch.tensor([int(edge.flow) for edge in graph.edge])
 
     edge_attr = torch.cat([flows, positions]).view(2, -1).t().contiguous()
 
     # collect x
-    types = []
-    xs = []
-
-    for i, node_data in nx_graph.nodes(data=True):
-        types.append(node_data['type'])
-        xs.append(node_data['x'][0])
-
-    xs = torch.tensor(xs)
-    types = torch.tensor(types)
+    vocabulary_indices = vocab_ids = [
+        vocabulary.get(node.text, len(vocabulary))
+        for node in graph.node
+    ]
+    xs = torch.tensor(vocabulary_indices)
+    types = torch.tensor([int(node.type) for node in graph.node])
 
     x = torch.cat([xs, types]).view(2, -1).t().contiguous()
 
@@ -86,8 +97,8 @@ def nx2data(nx_graph, class_label=None, ignore_profile_info=True):
     }
     
     # maybe collect these data too
-    if class_label is not None:
-        y = torch.tensor(int(class_label)).view(1)  # <1>
+    if y_feature_name is not None:
+        y = torch.tensor(graph.features.feature[y_feature_name].int64_list.value[0]).view(1)  # <1>
         data_dict['y'] = y
     
     # branch prediction / profile info specific
