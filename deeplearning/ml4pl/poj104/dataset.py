@@ -99,6 +99,8 @@ def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
     # maybe collect these data too
     if y_feature_name is not None:
         y = torch.tensor(graph.features.feature[y_feature_name].int64_list.value[0]).view(1)  # <1>
+        if y_feature_name == "poj104_label":
+            y -= 1
         data_dict['y'] = y
     
     # branch prediction / profile info specific

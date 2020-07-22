@@ -203,8 +203,8 @@
                 "transformer_poj104",
                 "--dataset",
                 "poj104",
-                //"--config_json",
-                //"{'train_subset': [0, 10], 'batch_size': 64, 'num_epochs': 3, 'vocab_size': 2231}",
+                "--config_json",
+                "{'train_subset': [0, 10], 'batch_size': 64, 'num_epochs': 3, 'vocab_size': 2231}",
             ]
         },
         {
