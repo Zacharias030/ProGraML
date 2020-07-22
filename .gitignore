@@ -2,7 +2,6 @@
 .env
 bootstrap.sh
 config.pbtxt
-requirements.txt
 
 # Files created by bazel
 bazel-bin
