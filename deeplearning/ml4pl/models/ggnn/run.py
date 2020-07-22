@@ -353,9 +353,7 @@ class Learner(object):
         # maybe add labels
         if batch.y is not None:
             inputs.update({
-                # TODO this is a hotfix and not required after re-collating the data_train.pb
-                # of the rebuttal-classifyapp-dataset
-                "labels": batch.y - 1,
+                "labels": batch.y,
             })
 
         # add other stuff
