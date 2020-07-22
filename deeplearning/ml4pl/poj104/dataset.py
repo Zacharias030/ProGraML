@@ -103,6 +103,7 @@ def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
     
     # branch prediction / profile info specific
     if not ignore_profile_info:
+        raise NotImplementedError("profile info is not supported with the new nx2data (from programgraph) adaptation.")
         profile_info = []
         for i, node_data in nx_graph.nodes(data=True):
             # default to -1, -1, -1 if not all profile info is given.
