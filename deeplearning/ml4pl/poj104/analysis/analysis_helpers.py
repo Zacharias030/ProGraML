@@ -14,20 +14,23 @@ def get_all_runs(log_dir, subfolders=False, exclude=['test_only'], upper_bound_e
     logs = {}
     hyps = {}
     for file in sorted(list(log_dir.glob('*_log.json'))):
-        with open(file, 'r') as f:
-            try:
+        
+        try:
+            with open(file, 'r') as f:
                 log = pd.read_json(f, orient='records')
-            except ValueError as e:
-                print(f'failing on {file}!')
-                try:
+        except ValueError as e:
+            try:
+                with open(file, 'r') as f:
                     jsondata = json.load(f)
                     log = pd.DataFrame(jsondata)
-                except:
-                    continue
-                #raise e
-            # handle 'test_only' epochs later!
-            if log['epoch'].values[0] == 'test_only':
+            except Exception as ee:
+                print(f'failing on {file}!')
+                raise ee
                 continue
+            #raise e
+        # handle 'test_only' epochs later!
+        if log['epoch'].values[0] == 'test_only':
+            continue
 
         run_name = file.name.rsplit('_log.json')[0]
         # skip weird files
@@ -62,7 +65,7 @@ def get_all_runs(log_dir, subfolders=False, exclude=['test_only'], upper_bound_e
         if short_run_name not in hyps:
             hyps[short_run_name] = hyp
         else:
-            assert hyp == hyps[short_run_name]
+            assert hyp == hyps[short_run_name], f"expected {hyps[short_run_name]}\n but got {hyp}!"
 
         # flatten dataframe
         try:
@@ -183,6 +186,7 @@ def annot_max(x, y, test_y, color='k', label=None, ax=None, invert_acc=True):
               bbox=bbox_props,
               ha="right",
               va="top")
+    print(text)
     ax.annotate(text, xy=(xargmax, ymax), xytext=(xmax + np.random.uniform(-xmax/1.5,xmax/2) , max((ymax - 0.951)*24 + 0.7, 0.91 + np.random.uniform(-0.01, 0.01))) , **kw)  # xytext=(xmax,0.90 + (np.random.rand() - 0.5) / 5)
 
 
