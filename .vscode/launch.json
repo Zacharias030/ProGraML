@@ -189,6 +189,25 @@
             ]
         },
         {
+            "name": "Python: REBUTTAL run transformer poj104",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/deeplearning/ml4pl/models/ggnn/run.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--data_dir",
+                "~/rebuttal_datasets/classifyapp/",
+                "--log_dir",
+                "deeplearning/ml4pl/poj104/classifyapp_logs/rebuttal_debug/",
+                "--model",
+                "transformer_poj104",
+                "--dataset",
+                "poj104",
+                //"--config_json",
+                //"{'train_subset': [0, 10], 'batch_size': 64, 'num_epochs': 3, 'vocab_size': 2231}",
+            ]
+        },
+        {
             "name": "Python: run ggnn supervised",
             "type": "python",
             "request": "launch",

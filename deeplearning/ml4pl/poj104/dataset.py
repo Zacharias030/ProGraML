@@ -30,7 +30,7 @@ REPO_ROOT = Path(REPO_ROOT)
 
 
 # The vocabulary file used in the dataflow experiments.
-PROGRAML_VOCABULARY = Path("deeplearning/ml4pl/poj104/programl_vocabulary.csv")
+PROGRAML_VOCABULARY = REPO_ROOT / "deeplearning/ml4pl/poj104/programl_vocabulary.csv"
 assert PROGRAML_VOCABULARY.is_file()
 
 
@@ -971,29 +971,33 @@ class POJ104Dataset(InMemoryDataset):
         # ~~~~~ we need to create the full dataset ~~~~~~~~~~~
         assert not full_dataset.is_file(), 'shouldnt be'
         processed_path = str(full_dataset)
-
+        
+        # get vocab first
+        vocab = load_vocabulary(PROGRAML_VOCABULARY)
+        assert len(vocab) > 0, "vocab is empty :|"
         # read data into huge `Data` list.
         data_list = []
 
         ds_base = Path(self.root)
         print(f'Creating {self.split} dataset at {str(ds_base)}')
 
-        split_folder = ds_base / ('ir_' + self.split)
+        split_folder = ds_base / (self.split)
         assert split_folder.exists(), f"{split_folder} doesn't exist!"
         
-        # collect .ll.p instead and call nx2data on the fly!
-        print(f"=== DATASET {split_folder}: Collecting .ll.p files into dataset")
+        # collect .pb and call nx2data on the fly!
+        print(f"=== DATASET {split_folder}: Collecting ProgramGraph.pb files into dataset")
 
         # only take files from subfolders (with class names!) recursively
-        files = [x for x in split_folder.rglob("*.ll.p") if x.parent.name != split_folder.name]
+        files = [x for x in split_folder.rglob("*ProgramGraph.pb")]
+        assert len(files) > 0, "no files collected. error."
         for file in tqdm.tqdm(files):
             # skip classes that are larger than what config says to enable debugging with less data
-            class_label = int(file.parent.name) - 1  # let classes start from 0.
-            if class_label >= num_classes:
-                continue
+            #class_label = int(file.parent.name) - 1  # let classes start from 0.
+            #if class_label >= num_classes:
+            #    continue
 
             g = load(file)
-            data = nx2data(g, class_label)
+            data = nx2data(g, vocabulary=vocab, y_feature_name="poj104_label")
             data_list.append(data)
 
         print(f" * COMPLETED * === DATASET {split_folder}: now pre-filtering...")
