@@ -12,6 +12,7 @@ import torch
 from torch_geometric.data import InMemoryDataset, Data
 
 import csv
+import enum
 from pathlib import Path
 from typing import Dict, Optional
 from programl.proto.program_graph_pb2 import ProgramGraph
@@ -56,9 +57,22 @@ def load_vocabulary(path: Path):
     return vocab
 
 
+class AblationVocab(enum.IntEnum):
+    # No ablation - use the full vocabulary (default).
+    NONE = 0
+    # Ignore the vocabulary - every node has an x value of 0.
+    NO_VOCAB = 1
+    # Use a 3-element vocabulary based on the node type:
+    #    0 - Instruction node
+    #    1 - Variable node
+    #    2 - Constant node
+    NODE_TYPE_ONLY = 2
+
+
 def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
             y_feature_name: Optional[str] = None,
-            ignore_profile_info=True):
+            ignore_profile_info=True,
+            ablate_vocab = AblationVocab.NONE):
     r"""Converts a program graph protocol buffer to a
     :class:`torch_geometric.data.Data` instance.
 
@@ -66,6 +80,7 @@ def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
         graph           A program graph protocol buffer.
         vocabulary      A map from node text to vocabulary indices.
         y_feature_name  The name of the graph-level feature to use as class label.
+        ablate_vocab    Whether to use an ablation vocabulary.
     """
 
     # collect edge_index
@@ -79,10 +94,18 @@ def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
     edge_attr = torch.cat([flows, positions]).view(2, -1).t().contiguous()
 
     # collect x
-    vocabulary_indices = vocab_ids = [
-        vocabulary.get(node.text, len(vocabulary))
-        for node in graph.node
-    ]
+    if ablate_vocab == AblationVocab.NONE:
+        vocabulary_indices = vocab_ids = [
+            vocabulary.get(node.text, len(vocabulary))
+            for node in graph.node
+        ]
+    elif ablate_vocab == AblationVocab.NO_VOCAB:
+        vocabulary_indices = [0] * len(graph.node)
+    elif ablate_vocab == AblationVocab.NODE_TYPE_ONLY:
+        vocabulary_indices = [int(node.type) for node in graph.node]
+    else:
+        raise NotImplementedError("unreachable")
+
     xs = torch.tensor(vocabulary_indices)
     types = torch.tensor([int(node.type) for node in graph.node])
 
