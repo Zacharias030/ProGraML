@@ -13,6 +13,7 @@ from torch_geometric.data import InMemoryDataset, Data
 
 import csv
 import enum
+import subprocess
 from pathlib import Path
 from typing import Dict, Optional
 from programl.proto.program_graph_pb2 import ProgramGraph
@@ -30,16 +31,48 @@ sys.path.insert(1, REPO_ROOT)
 REPO_ROOT = Path(REPO_ROOT)
 
 
-# The vocabulary file used in the dataflow experiments.
-PROGRAML_VOCABULARY = REPO_ROOT / "deeplearning/ml4pl/poj104/programl_vocabulary.csv"
-assert PROGRAML_VOCABULARY.is_file()
+# The vocabulary files used in the dataflow experiments.
+PROGRAML_VOCABULARY = Path("deeplearning/ml4pl/poj104/programl_vocabulary.csv")
+CDFG_VOCABULARY = Path("deeplearning/ml4pl/poj104/cdfg_vocabulary.csv")
+assert PROGRAML_VOCABULARY.is_file(), f"File not found: {PROGRAML_VOCABULARY}"
+assert CDFG_VOCABULARY.is_file(), f"File not found: {CDFG_VOCABULARY}"
+
+# The path of the graph2cdfg binary which converts ProGraML graphs to the CDFG
+# representation.
+#
+# To build this file, clone the ProGraML repo and build
+# //programl/cmd:graph2cdfg:
+#
+#   1.  git clone https://github.com/ChrisCummins/ProGraML.git
+#   2.  cd ProGraML
+#   3.  git checkout 2d93e5e14bf321336f1928d3364e9d7196cee995
+#   4.  bazel build -c opt //programl/cmd:graph2cdfg
+#   5.  cp -v bazel-bin/programl/cmd/graph2cdfg ${THIS_DIR}
+#
+GRAPH2CDFG = Path("deeplearning/ml4pl/poj104/graph2cdfg")
+assert GRAPH2CDFG.is_file(), f"File not found: {GRAPH2CDFG}"
 
 
-def load(file: str) -> ProgramGraph:
-    """Read a ProgramGraph protocol buffer from file."""
+def load(file: str, cdfg: bool = False) -> ProgramGraph:
+    """Read a ProgramGraph protocol buffer from file.
+
+    Args:
+        file: The path of the ProgramGraph protocol buffer to load.
+        cdfg: If true, convert the graph to CDFG during load.
+    """
     graph = ProgramGraph()
     with open(file, 'rb') as f:
-        graph.ParseFromString(f.read())
+        proto = f.read()
+
+    if cdfg:
+        graph2cdfg = subprocess.Popen(
+            [str(GRAPH2CDFG), '--stdin_fmt=pb', '--stdout_fmt=pb'],
+            stdin=subprocess.PIPE,  stdout=subprocess.PIPE
+        )
+        proto, _ = graph2cdfg.communicate(proto)
+        assert not graph2cdfg.returncode, f"CDFG conversion failed: {file}"
+
+    graph.ParseFromString(proto)
     return graph
 
 
@@ -925,17 +958,19 @@ class POJ104Dataset(InMemoryDataset):
     def __init__(self, root='deeplearning/ml4pl/poj104/classifyapp_data',
                  split='fail',
                  transform=None, pre_transform=None,
-                 train_subset=[0, 100], train_subset_seed=0):
+                 train_subset=[0, 100], train_subset_seed=0,
+                 cdfg: bool = False):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
                             sample a random (but fixed) train set of data in slice by percent, with given seed.
             train_subset_seed: seed for the train_subset fixed random permutation.
-
+            cdfg: Use the CDFG graph format and vocabulary.
         """
         self.split = split
         self.train_subset = train_subset
         self.train_subset_seed = train_subset_seed
+        self.cdfg = cdfg
         super().__init__(root, transform, pre_transform)
 
         assert split in ['train', 'val', 'test']
@@ -984,7 +1019,8 @@ class POJ104Dataset(InMemoryDataset):
         num_classes = 104
 
         # check if we need to create the full dataset:
-        full_dataset = Path(self.processed_dir) / f'{self.split}_data.pt'
+        dataset_name = f"{self.split}_cdfg" if self.cdfg else self.split
+        full_dataset = Path(self.processed_dir) / f'{dataset_name}_data.pt'
         if full_dataset.is_file():
             assert self.split == 'train', 'here shouldnt be reachable.'
             print(f"Full dataset found. Generating train_subset={self.train_subset} with seed={self.train_subset_seed}")
@@ -999,7 +1035,7 @@ class POJ104Dataset(InMemoryDataset):
         processed_path = str(full_dataset)
         
         # get vocab first
-        vocab = load_vocabulary(PROGRAML_VOCABULARY)
+        vocab = load_vocabulary(CDFG_VOCABULARY if self.cdfg else PROGRAML_VOCABULARY)
         assert len(vocab) > 0, "vocab is empty :|"
         # read data into huge `Data` list.
         data_list = []
@@ -1022,7 +1058,7 @@ class POJ104Dataset(InMemoryDataset):
             #if class_label >= num_classes:
             #    continue
 
-            g = load(file)
+            g = load(file, cdfg=self.cdfg)
             data = nx2data(g, vocabulary=vocab, y_feature_name="poj104_label")
             data_list.append(data)
 
