@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+import os
 from deeplearning.ml4pl.poj104 import dataset
 
 TEST_PROTO = "programl/proto/example.ProgramGraph.pb"
+DEVMAP = os.path.expanduser("~/programl/devmap")
 
 graph = dataset.load(TEST_PROTO)
 print("Loaded graph with", len(graph.node), "nodes and", len(graph.edge), "edges")
@@ -27,3 +29,7 @@ print("Created POJ-104 labelled graph data", data)
 
 graph = dataset.load(TEST_PROTO, cdfg=True)
 print("Loaded CDFG graph with", len(graph.node), "nodes and", len(graph.edge), "edges")
+
+if os.path.isdir(DEVMAP):
+    dataset.DevmapDataset(root=DEVMAP, split="amd")
+    dataset.DevmapDataset(root=DEVMAP, split="amd", cdfg=True)
