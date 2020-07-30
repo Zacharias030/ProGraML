@@ -13,6 +13,7 @@ from torch_geometric.data import InMemoryDataset, Data
 
 import csv
 import enum
+import subprocess
 from pathlib import Path
 from typing import Dict, Optional
 from programl.proto.program_graph_pb2 import ProgramGraph
@@ -30,16 +31,48 @@ sys.path.insert(1, REPO_ROOT)
 REPO_ROOT = Path(REPO_ROOT)
 
 
-# The vocabulary file used in the dataflow experiments.
-PROGRAML_VOCABULARY = REPO_ROOT / "deeplearning/ml4pl/poj104/programl_vocabulary.csv"
-assert PROGRAML_VOCABULARY.is_file()
+# The vocabulary files used in the dataflow experiments.
+PROGRAML_VOCABULARY = Path("deeplearning/ml4pl/poj104/programl_vocabulary.csv")
+CDFG_VOCABULARY = Path("deeplearning/ml4pl/poj104/cdfg_vocabulary.csv")
+assert PROGRAML_VOCABULARY.is_file(), f"File not found: {PROGRAML_VOCABULARY}"
+assert CDFG_VOCABULARY.is_file(), f"File not found: {CDFG_VOCABULARY}"
+
+# The path of the graph2cdfg binary which converts ProGraML graphs to the CDFG
+# representation.
+#
+# To build this file, clone the ProGraML repo and build
+# //programl/cmd:graph2cdfg:
+#
+#   1.  git clone https://github.com/ChrisCummins/ProGraML.git
+#   2.  cd ProGraML
+#   3.  git checkout 2d93e5e14bf321336f1928d3364e9d7196cee995
+#   4.  bazel build -c opt //programl/cmd:graph2cdfg
+#   5.  cp -v bazel-bin/programl/cmd/graph2cdfg ${THIS_DIR}
+#
+GRAPH2CDFG = Path("deeplearning/ml4pl/poj104/graph2cdfg")
+assert GRAPH2CDFG.is_file(), f"File not found: {GRAPH2CDFG}"
 
 
-def load(file: str) -> ProgramGraph:
-    """Read a ProgramGraph protocol buffer from file."""
+def load(file: str, cdfg: bool = False) -> ProgramGraph:
+    """Read a ProgramGraph protocol buffer from file.
+
+    Args:
+        file: The path of the ProgramGraph protocol buffer to load.
+        cdfg: If true, convert the graph to CDFG during load.
+    """
     graph = ProgramGraph()
     with open(file, 'rb') as f:
-        graph.ParseFromString(f.read())
+        proto = f.read()
+
+    if cdfg:
+        graph2cdfg = subprocess.Popen(
+            [str(GRAPH2CDFG), '--stdin_fmt=pb', '--stdout_fmt=pb'],
+            stdin=subprocess.PIPE,  stdout=subprocess.PIPE
+        )
+        proto, _ = graph2cdfg.communicate(proto)
+        assert not graph2cdfg.returncode, f"CDFG conversion failed: {file}"
+
+    graph.ParseFromString(proto)
     return graph
 
 
@@ -766,19 +799,20 @@ class ThreadcoarseningDataset(InMemoryDataset):
 class DevmapDataset(InMemoryDataset):
     def __init__(self, root='deeplearning/ml4pl/poj104/devmap_data',
                  split='fail', transform=None, pre_transform=None,
-                 train_subset=[0, 100], train_subset_seed=0):
+                 train_subset=[0, 100], train_subset_seed=0, cdfg: bool = False):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
                             sample a random (but fixed) train set of data in slice by percent, with given seed.
             train_subset_seed: seed for the train_subset fixed random permutation.
             split: 'amd' or 'nvidia'
-
+            cdfg: Use CDFG graph representation.
         """
         assert split in ['amd', 'nvidia'], f"Split is {split}, but has to be 'amd' or 'nvidia'"
         self.split = split
         self.train_subset = train_subset
         self.train_subset_seed = train_subset_seed
+        self.cdfg = cdfg
         super().__init__(root, transform, pre_transform)
 
         self.data, self.slices = torch.load(self.processed_paths[0])
@@ -789,12 +823,14 @@ class DevmapDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        base = f'{self.split}_data.pt'
+        name = f"{self.split}_cdfg" if self.cdfg else self.split
+
+        base = f'{name}_data.pt'
 
         if tuple(self.train_subset) == (0, 100):
             return [base]
         else:
-            return [f'{self.split}_data_subset_{self.train_subset[0]}_{self.train_subset[1]}_seed_{self.train_subset_seed}.pt']
+            return [f'{name}_data_subset_{self.train_subset[0]}_{self.train_subset[1]}_seed_{self.train_subset_seed}.pt']
 
     def download(self):
         # download to self.raw_dir
@@ -834,7 +870,8 @@ class DevmapDataset(InMemoryDataset):
 
     def process(self):
         # check if we need to create the full dataset:
-        full_dataset = Path(self.processed_dir) / f'{self.split}_data.pt'
+        name = f"{self.split}_cdfg" if self.cdfg else self.split
+        full_dataset = Path(self.processed_dir) / f'{name}_data.pt'
         if full_dataset.is_file():
             print(f"Full dataset {full_dataset.name} found. Generating train_subset={self.train_subset} with seed={self.train_subset_seed}")
             # just get the split and save it
@@ -848,20 +885,13 @@ class DevmapDataset(InMemoryDataset):
         processed_path = str(full_dataset)
 
 
+        vocab = load_vocabulary(CDFG_VOCABULARY if self.cdfg else PROGRAML_VOCABULARY)
+        assert len(vocab) > 0, "vocab is empty :|"
+
         root = Path(self.root)
 
-        # Load runtime data
-        data_file = root / f"cgo17-{self.split}.csv"
-        print('\n--- Read data from', data_file)
-        df = pd.read_csv(data_file)
         # Get list of source file names and attributes
-        input_files = df["benchmark"].values   # list of strings of benchmark names
-        dataset = df["dataset"].values         # list of strings of dataset descriptions
-        aux_transfer_size = df["transfer"].values
-        aux_wg_size = df["wgsize"].values
-        oracle = df['oracle'].values
-        runtime_cpu = df['runtime_cpu'].values
-        runtime_gpu = df['runtime_gpu'].values
+        input_files = list((root / f"graphs_{self.split}").iterdir())
 
         num_files = len(input_files)
         print('\n--- Preparing to read', num_files, 'input files')
@@ -871,42 +901,32 @@ class DevmapDataset(InMemoryDataset):
         data_list = []
         for i in tqdm.tqdm(range(num_files)):
             filename = input_files[i]
-            dat = dataset[i]
-            if filename[:3] == "npb":
-                # concatenate data set size
-                filename += '_' + str(dat)
 
-            # Updated from legacy
-            #file = Path(self.root) / 'kernels_ir_programl' / (filename + '.data.p')
-            file = Path(self.root) / 'kernels_ir' / (filename + '.ll.p')
-            
-            if file.exists():
-                # legacy
-                # load preprocessed data (without labels etc.)
-                #with open(file, 'rb') as f:
-                #    data = pickle.load(f)
-                # new
-                g = load(file)
-                data = nx2data(g)
-            else:
-                assert False, f'input file not found: {str(file)}. Did you run data preprocessing?'
+            proto = load(filename, cdfg=self.cdfg)
+            data = nx2data(proto, vocabulary=vocab)
 
-            # add data
-            data['y'] = torch.tensor([1]) if oracle[i] == 'GPU' else torch.tensor([0]) # CPU
-            data['aux_in'] = torch.tensor([[aux_transfer_size[i], aux_wg_size[i]]])
-            data['runtimes'] = torch.tensor([[runtime_cpu[i], runtime_gpu[i]]])
-            # TODO hacky fix for 
-            if hasattr(data, 'runtime'): delattr(data, 'runtime')
+            # graph2cdfg conversion drops the graph features, so we may have to 
+            # reload the graph.
+            if self.cdfg:
+                proto = load(filename)
+
+            # Add the features and label.
+            proto_features = proto.features.feature
+            data['y'] = torch.tensor(proto_features["devmap_label"].int64_list.value[0]).view(1)
+            data['aux_in'] = torch.tensor([
+                proto_features["transfer_bytes"].int64_list.value[0],
+                proto_features["wgsize"].int64_list.value[0],
+            ])
 
             data_list.append(data)
 
         ##################################
 
-        print(f" * COMPLETED * === DATASET Devmap-{self.split}: now pre-filtering...")
+        print(f" * COMPLETED * === DATASET Devmap-{name}: now pre-filtering...")
 
         if self.pre_filter is not None:
             data_list = [d for d in data_list if self.pre_filter(d)]
-        print(f" * COMPLETED * === DATASET Devmap-{self.split}: Completed filtering, now pre_transforming...")
+        print(f" * COMPLETED * === DATASET Devmap-{name}: Completed filtering, now pre_transforming...")
 
         if self.pre_transform is not None:
             data_list = [self.pre_transform(d) for d in data_list]
@@ -925,17 +945,19 @@ class POJ104Dataset(InMemoryDataset):
     def __init__(self, root='deeplearning/ml4pl/poj104/classifyapp_data',
                  split='fail',
                  transform=None, pre_transform=None,
-                 train_subset=[0, 100], train_subset_seed=0):
+                 train_subset=[0, 100], train_subset_seed=0,
+                 cdfg: bool = False):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
                             sample a random (but fixed) train set of data in slice by percent, with given seed.
             train_subset_seed: seed for the train_subset fixed random permutation.
-
+            cdfg: Use the CDFG graph format and vocabulary.
         """
         self.split = split
         self.train_subset = train_subset
         self.train_subset_seed = train_subset_seed
+        self.cdfg = cdfg
         super().__init__(root, transform, pre_transform)
 
         assert split in ['train', 'val', 'test']
@@ -984,7 +1006,8 @@ class POJ104Dataset(InMemoryDataset):
         num_classes = 104
 
         # check if we need to create the full dataset:
-        full_dataset = Path(self.processed_dir) / f'{self.split}_data.pt'
+        dataset_name = f"{self.split}_cdfg" if self.cdfg else self.split
+        full_dataset = Path(self.processed_dir) / f'{dataset_name}_data.pt'
         if full_dataset.is_file():
             assert self.split == 'train', 'here shouldnt be reachable.'
             print(f"Full dataset found. Generating train_subset={self.train_subset} with seed={self.train_subset_seed}")
@@ -999,7 +1022,7 @@ class POJ104Dataset(InMemoryDataset):
         processed_path = str(full_dataset)
         
         # get vocab first
-        vocab = load_vocabulary(PROGRAML_VOCABULARY)
+        vocab = load_vocabulary(CDFG_VOCABULARY if self.cdfg else PROGRAML_VOCABULARY)
         assert len(vocab) > 0, "vocab is empty :|"
         # read data into huge `Data` list.
         data_list = []
@@ -1022,7 +1045,7 @@ class POJ104Dataset(InMemoryDataset):
             #if class_label >= num_classes:
             #    continue
 
-            g = load(file)
+            g = load(file, cdfg=self.cdfg)
             data = nx2data(g, vocabulary=vocab, y_feature_name="poj104_label")
             data_list.append(data)
 
