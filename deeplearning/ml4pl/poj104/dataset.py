@@ -102,6 +102,30 @@ class AblationVocab(enum.IntEnum):
     NODE_TYPE_ONLY = 2
 
 
+def filename(
+        split: str,
+        cdfg: bool = False,
+        ablation_vocab: AblationVocab = AblationVocab.NONE
+    ) -> str:
+    """Generate the name for a data file.
+
+    Args:
+        split: The name of the split.
+        cdfg: Whether using CDFG representation.
+        ablate_vocab: The ablation vocab type.
+
+    Returns:
+        A file name which uniquely identifies this combination of
+        split/cdfg/ablation.
+    """
+    name = str(split)
+    if cdfg:
+        name = f"{name}_cdfg"
+    if ablation_vocab != AblationVocab.NONE:
+        name = f"{name}_{ablation_vocab.name.lower()}"
+    return f"{name}_data.pt"
+
+
 def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
             y_feature_name: Optional[str] = None,
             ignore_profile_info=True,
@@ -799,7 +823,8 @@ class ThreadcoarseningDataset(InMemoryDataset):
 class DevmapDataset(InMemoryDataset):
     def __init__(self, root='deeplearning/ml4pl/poj104/devmap_data',
                  split='fail', transform=None, pre_transform=None,
-                 train_subset=[0, 100], train_subset_seed=0, cdfg: bool = False):
+                 train_subset=[0, 100], train_subset_seed=0, cdfg: bool = False,
+                 ablation_vocab: AblationVocab = AblationVocab.NONE):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
@@ -813,6 +838,7 @@ class DevmapDataset(InMemoryDataset):
         self.train_subset = train_subset
         self.train_subset_seed = train_subset_seed
         self.cdfg = cdfg
+        self.ablation_vocab = ablation_vocab
         super().__init__(root, transform, pre_transform)
 
         self.data, self.slices = torch.load(self.processed_paths[0])
@@ -823,9 +849,7 @@ class DevmapDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        name = f"{self.split}_cdfg" if self.cdfg else self.split
-
-        base = f'{name}_data.pt'
+        base = filename(self.split, self.cdfg, self.ablation_vocab)
 
         if tuple(self.train_subset) == (0, 100):
             return [base]
@@ -870,8 +894,8 @@ class DevmapDataset(InMemoryDataset):
 
     def process(self):
         # check if we need to create the full dataset:
-        name = f"{self.split}_cdfg" if self.cdfg else self.split
-        full_dataset = Path(self.processed_dir) / f'{name}_data.pt'
+        name = filename(self.split, self.cdfg, self.ablation_vocab)
+        full_dataset = Path(self.processed_dir) / name
         if full_dataset.is_file():
             print(f"Full dataset {full_dataset.name} found. Generating train_subset={self.train_subset} with seed={self.train_subset_seed}")
             # just get the split and save it
@@ -903,7 +927,7 @@ class DevmapDataset(InMemoryDataset):
             filename = input_files[i]
 
             proto = load(filename, cdfg=self.cdfg)
-            data = nx2data(proto, vocabulary=vocab)
+            data = nx2data(proto, vocabulary=vocab, ablate_vocab=self.ablation_vocab)
 
             # graph2cdfg conversion drops the graph features, so we may have to 
             # reload the graph.
@@ -946,7 +970,8 @@ class POJ104Dataset(InMemoryDataset):
                  split='fail',
                  transform=None, pre_transform=None,
                  train_subset=[0, 100], train_subset_seed=0,
-                 cdfg: bool = False):
+                 cdfg: bool = False,
+                 ablation_vocab: AblationVocab = AblationVocab.NONE):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
@@ -958,6 +983,7 @@ class POJ104Dataset(InMemoryDataset):
         self.train_subset = train_subset
         self.train_subset_seed = train_subset_seed
         self.cdfg = cdfg
+        self.ablation_vocab = ablation_vocab
         super().__init__(root, transform, pre_transform)
 
         assert split in ['train', 'val', 'test']
@@ -969,7 +995,7 @@ class POJ104Dataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        base = f'{self.split}_data.pt'
+        base = filename(self.split, self.cdfg, self.ablation_vocab)
 
         if tuple(self.train_subset) == (0, 100) or self.split in ['val', 'test']:
             return [base]
@@ -1006,8 +1032,7 @@ class POJ104Dataset(InMemoryDataset):
         num_classes = 104
 
         # check if we need to create the full dataset:
-        dataset_name = f"{self.split}_cdfg" if self.cdfg else self.split
-        full_dataset = Path(self.processed_dir) / f'{dataset_name}_data.pt'
+        full_dataset = Path(self.processed_dir) / filename(self.split, self.cdfg, self.ablation_vocab)
         if full_dataset.is_file():
             assert self.split == 'train', 'here shouldnt be reachable.'
             print(f"Full dataset found. Generating train_subset={self.train_subset} with seed={self.train_subset_seed}")
@@ -1046,7 +1071,8 @@ class POJ104Dataset(InMemoryDataset):
             #    continue
 
             g = load(file, cdfg=self.cdfg)
-            data = nx2data(g, vocabulary=vocab, y_feature_name="poj104_label")
+            data = nx2data(g, vocabulary=vocab, ablate_vocab=self.ablation_vocab,
+                           y_feature_name="poj104_label")
             data_list.append(data)
 
         print(f" * COMPLETED * === DATASET {split_folder}: now pre-filtering...")
