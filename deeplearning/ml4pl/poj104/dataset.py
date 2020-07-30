@@ -11,6 +11,13 @@ from sklearn.model_selection import StratifiedKFold, KFold
 import torch
 from torch_geometric.data import InMemoryDataset, Data
 
+import csv
+import enum
+import subprocess
+from pathlib import Path
+from typing import Dict, Optional
+from programl.proto.program_graph_pb2 import ProgramGraph
+
 
 # make this file executable from anywhere
 
@@ -24,56 +31,140 @@ sys.path.insert(1, REPO_ROOT)
 REPO_ROOT = Path(REPO_ROOT)
 
 
-def load(file):
+# The vocabulary files used in the dataflow experiments.
+PROGRAML_VOCABULARY = Path("deeplearning/ml4pl/poj104/programl_vocabulary.csv")
+CDFG_VOCABULARY = Path("deeplearning/ml4pl/poj104/cdfg_vocabulary.csv")
+assert PROGRAML_VOCABULARY.is_file(), f"File not found: {PROGRAML_VOCABULARY}"
+assert CDFG_VOCABULARY.is_file(), f"File not found: {CDFG_VOCABULARY}"
+
+# The path of the graph2cdfg binary which converts ProGraML graphs to the CDFG
+# representation.
+#
+# To build this file, clone the ProGraML repo and build
+# //programl/cmd:graph2cdfg:
+#
+#   1.  git clone https://github.com/ChrisCummins/ProGraML.git
+#   2.  cd ProGraML
+#   3.  git checkout 2d93e5e14bf321336f1928d3364e9d7196cee995
+#   4.  bazel build -c opt //programl/cmd:graph2cdfg
+#   5.  cp -v bazel-bin/programl/cmd/graph2cdfg ${THIS_DIR}
+#
+GRAPH2CDFG = Path("deeplearning/ml4pl/poj104/graph2cdfg")
+assert GRAPH2CDFG.is_file(), f"File not found: {GRAPH2CDFG}"
+
+
+def load(file: str, cdfg: bool = False) -> ProgramGraph:
+    """Read a ProgramGraph protocol buffer from file.
+
+    Args:
+        file: The path of the ProgramGraph protocol buffer to load.
+        cdfg: If true, convert the graph to CDFG during load.
+    """
+    graph = ProgramGraph()
     with open(file, 'rb') as f:
-        try:
-            data = pickle.load(f)
-        except EOFError as e:
-            print(f"Failing on {str(file)}")
-            raise e
-    return data
+        proto = f.read()
+
+    if cdfg:
+        graph2cdfg = subprocess.Popen(
+            [str(GRAPH2CDFG), '--stdin_fmt=pb', '--stdout_fmt=pb'],
+            stdin=subprocess.PIPE,  stdout=subprocess.PIPE
+        )
+        proto, _ = graph2cdfg.communicate(proto)
+        assert not graph2cdfg.returncode, f"CDFG conversion failed: {file}"
+
+    graph.ParseFromString(proto)
+    return graph
 
 
-def nx2data(nx_graph, class_label=None, ignore_profile_info=True):
-    r"""Converts a :obj:`networkx.Graph` or :obj:`networkx.DiGraph` to a
+def load_vocabulary(path: Path):
+    """Read the vocabulary file used in the dataflow experiments."""
+    vocab = {}
+    with open(path) as f:
+        vocab_file = csv.reader(f.readlines(), delimiter="\t")
+        for i, row in enumerate(vocab_file, start=-1):
+            if i == -1:  # Skip the header.
+                continue
+            (_, _, _, text) = row
+            vocab[text] = i
+
+    return vocab
+
+
+class AblationVocab(enum.IntEnum):
+    # No ablation - use the full vocabulary (default).
+    NONE = 0
+    # Ignore the vocabulary - every node has an x value of 0.
+    NO_VOCAB = 1
+    # Use a 3-element vocabulary based on the node type:
+    #    0 - Instruction node
+    #    1 - Variable node
+    #    2 - Constant node
+    NODE_TYPE_ONLY = 2
+
+
+def filename(
+        split: str,
+        cdfg: bool = False,
+        ablation_vocab: AblationVocab = AblationVocab.NONE
+    ) -> str:
+    """Generate the name for a data file.
+
+    Args:
+        split: The name of the split.
+        cdfg: Whether using CDFG representation.
+        ablate_vocab: The ablation vocab type.
+
+    Returns:
+        A file name which uniquely identifies this combination of
+        split/cdfg/ablation.
+    """
+    name = str(split)
+    if cdfg:
+        name = f"{name}_cdfg"
+    if ablation_vocab != AblationVocab.NONE:
+        name = f"{name}_{ablation_vocab.name.lower()}"
+    return f"{name}_data.pt"
+
+
+def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
+            y_feature_name: Optional[str] = None,
+            ignore_profile_info=True,
+            ablate_vocab = AblationVocab.NONE):
+    r"""Converts a program graph protocol buffer to a
     :class:`torch_geometric.data.Data` instance.
 
     Args:
-        G               (networkx.Graph or networkx.DiGraph): A networkx graph.
-        class_label     optional 'y' label. Should be int [0, ..., num_classes - 1]
+        graph           A program graph protocol buffer.
+        vocabulary      A map from node text to vocabulary indices.
+        y_feature_name  The name of the graph-level feature to use as class label.
+        ablate_vocab    Whether to use an ablation vocabulary.
     """
 
     # collect edge_index
-    edge_index = torch.tensor(list(nx_graph.edges())).t().contiguous()
+    edge_tuples = [(edge.source, edge.target) for edge in graph.edge]
+    edge_index = torch.tensor(edge_tuples).t().contiguous()
 
     # collect edge_attr
-    positions = []
-    flows = []
-
-    for i, (_, _, edge_data) in enumerate(nx_graph.edges(data=True)):
-        flows.append(edge_data['flow'])
-        # TODO(remove): this hack fixes a bug where call edges have position info!
-        # depends on merge of this fix https://github.com/ChrisCummins/phd/pull/106
-        if edge_data['flow'] == 2:
-            positions.append(0)
-        else:
-            positions.append(edge_data['position'])
-
-    positions = torch.tensor(positions)
-    flows = torch.tensor(flows)
+    positions = torch.tensor([edge.position for edge in graph.edge])
+    flows = torch.tensor([int(edge.flow) for edge in graph.edge])
 
     edge_attr = torch.cat([flows, positions]).view(2, -1).t().contiguous()
 
     # collect x
-    types = []
-    xs = []
+    if ablate_vocab == AblationVocab.NONE:
+        vocabulary_indices = vocab_ids = [
+            vocabulary.get(node.text, len(vocabulary))
+            for node in graph.node
+        ]
+    elif ablate_vocab == AblationVocab.NO_VOCAB:
+        vocabulary_indices = [0] * len(graph.node)
+    elif ablate_vocab == AblationVocab.NODE_TYPE_ONLY:
+        vocabulary_indices = [int(node.type) for node in graph.node]
+    else:
+        raise NotImplementedError("unreachable")
 
-    for i, node_data in nx_graph.nodes(data=True):
-        types.append(node_data['type'])
-        xs.append(node_data['x'][0])
-
-    xs = torch.tensor(xs)
-    types = torch.tensor(types)
+    xs = torch.tensor(vocabulary_indices)
+    types = torch.tensor([int(node.type) for node in graph.node])
 
     x = torch.cat([xs, types]).view(2, -1).t().contiguous()
 
@@ -86,12 +177,15 @@ def nx2data(nx_graph, class_label=None, ignore_profile_info=True):
     }
     
     # maybe collect these data too
-    if class_label is not None:
-        y = torch.tensor(int(class_label)).view(1)  # <1>
+    if y_feature_name is not None:
+        y = torch.tensor(graph.features.feature[y_feature_name].int64_list.value[0]).view(1)  # <1>
+        if y_feature_name == "poj104_label":
+            y -= 1
         data_dict['y'] = y
     
     # branch prediction / profile info specific
     if not ignore_profile_info:
+        raise NotImplementedError("profile info is not supported with the new nx2data (from programgraph) adaptation.")
         profile_info = []
         for i, node_data in nx_graph.nodes(data=True):
             # default to -1, -1, -1 if not all profile info is given.
@@ -729,19 +823,22 @@ class ThreadcoarseningDataset(InMemoryDataset):
 class DevmapDataset(InMemoryDataset):
     def __init__(self, root='deeplearning/ml4pl/poj104/devmap_data',
                  split='fail', transform=None, pre_transform=None,
-                 train_subset=[0, 100], train_subset_seed=0):
+                 train_subset=[0, 100], train_subset_seed=0, cdfg: bool = False,
+                 ablation_vocab: AblationVocab = AblationVocab.NONE):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
                             sample a random (but fixed) train set of data in slice by percent, with given seed.
             train_subset_seed: seed for the train_subset fixed random permutation.
             split: 'amd' or 'nvidia'
-
+            cdfg: Use CDFG graph representation.
         """
         assert split in ['amd', 'nvidia'], f"Split is {split}, but has to be 'amd' or 'nvidia'"
         self.split = split
         self.train_subset = train_subset
         self.train_subset_seed = train_subset_seed
+        self.cdfg = cdfg
+        self.ablation_vocab = ablation_vocab
         super().__init__(root, transform, pre_transform)
 
         self.data, self.slices = torch.load(self.processed_paths[0])
@@ -752,12 +849,12 @@ class DevmapDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        base = f'{self.split}_data.pt'
+        base = filename(self.split, self.cdfg, self.ablation_vocab)
 
         if tuple(self.train_subset) == (0, 100):
             return [base]
         else:
-            return [f'{self.split}_data_subset_{self.train_subset[0]}_{self.train_subset[1]}_seed_{self.train_subset_seed}.pt']
+            return [f'{name}_data_subset_{self.train_subset[0]}_{self.train_subset[1]}_seed_{self.train_subset_seed}.pt']
 
     def download(self):
         # download to self.raw_dir
@@ -797,7 +894,8 @@ class DevmapDataset(InMemoryDataset):
 
     def process(self):
         # check if we need to create the full dataset:
-        full_dataset = Path(self.processed_dir) / f'{self.split}_data.pt'
+        name = filename(self.split, self.cdfg, self.ablation_vocab)
+        full_dataset = Path(self.processed_dir) / name
         if full_dataset.is_file():
             print(f"Full dataset {full_dataset.name} found. Generating train_subset={self.train_subset} with seed={self.train_subset_seed}")
             # just get the split and save it
@@ -811,20 +909,13 @@ class DevmapDataset(InMemoryDataset):
         processed_path = str(full_dataset)
 
 
+        vocab = load_vocabulary(CDFG_VOCABULARY if self.cdfg else PROGRAML_VOCABULARY)
+        assert len(vocab) > 0, "vocab is empty :|"
+
         root = Path(self.root)
 
-        # Load runtime data
-        data_file = root / f"cgo17-{self.split}.csv"
-        print('\n--- Read data from', data_file)
-        df = pd.read_csv(data_file)
         # Get list of source file names and attributes
-        input_files = df["benchmark"].values   # list of strings of benchmark names
-        dataset = df["dataset"].values         # list of strings of dataset descriptions
-        aux_transfer_size = df["transfer"].values
-        aux_wg_size = df["wgsize"].values
-        oracle = df['oracle'].values
-        runtime_cpu = df['runtime_cpu'].values
-        runtime_gpu = df['runtime_gpu'].values
+        input_files = list((root / f"graphs_{self.split}").iterdir())
 
         num_files = len(input_files)
         print('\n--- Preparing to read', num_files, 'input files')
@@ -834,42 +925,32 @@ class DevmapDataset(InMemoryDataset):
         data_list = []
         for i in tqdm.tqdm(range(num_files)):
             filename = input_files[i]
-            dat = dataset[i]
-            if filename[:3] == "npb":
-                # concatenate data set size
-                filename += '_' + str(dat)
 
-            # Updated from legacy
-            #file = Path(self.root) / 'kernels_ir_programl' / (filename + '.data.p')
-            file = Path(self.root) / 'kernels_ir' / (filename + '.ll.p')
-            
-            if file.exists():
-                # legacy
-                # load preprocessed data (without labels etc.)
-                #with open(file, 'rb') as f:
-                #    data = pickle.load(f)
-                # new
-                g = load(file)
-                data = nx2data(g)
-            else:
-                assert False, f'input file not found: {str(file)}. Did you run data preprocessing?'
+            proto = load(filename, cdfg=self.cdfg)
+            data = nx2data(proto, vocabulary=vocab, ablate_vocab=self.ablation_vocab)
 
-            # add data
-            data['y'] = torch.tensor([1]) if oracle[i] == 'GPU' else torch.tensor([0]) # CPU
-            data['aux_in'] = torch.tensor([[aux_transfer_size[i], aux_wg_size[i]]])
-            data['runtimes'] = torch.tensor([[runtime_cpu[i], runtime_gpu[i]]])
-            # TODO hacky fix for 
-            if hasattr(data, 'runtime'): delattr(data, 'runtime')
+            # graph2cdfg conversion drops the graph features, so we may have to 
+            # reload the graph.
+            if self.cdfg:
+                proto = load(filename)
+
+            # Add the features and label.
+            proto_features = proto.features.feature
+            data['y'] = torch.tensor(proto_features["devmap_label"].int64_list.value[0]).view(1)
+            data['aux_in'] = torch.tensor([
+                proto_features["transfer_bytes"].int64_list.value[0],
+                proto_features["wgsize"].int64_list.value[0],
+            ])
 
             data_list.append(data)
 
         ##################################
 
-        print(f" * COMPLETED * === DATASET Devmap-{self.split}: now pre-filtering...")
+        print(f" * COMPLETED * === DATASET Devmap-{name}: now pre-filtering...")
 
         if self.pre_filter is not None:
             data_list = [d for d in data_list if self.pre_filter(d)]
-        print(f" * COMPLETED * === DATASET Devmap-{self.split}: Completed filtering, now pre_transforming...")
+        print(f" * COMPLETED * === DATASET Devmap-{name}: Completed filtering, now pre_transforming...")
 
         if self.pre_transform is not None:
             data_list = [self.pre_transform(d) for d in data_list]
@@ -888,17 +969,21 @@ class POJ104Dataset(InMemoryDataset):
     def __init__(self, root='deeplearning/ml4pl/poj104/classifyapp_data',
                  split='fail',
                  transform=None, pre_transform=None,
-                 train_subset=[0, 100], train_subset_seed=0):
+                 train_subset=[0, 100], train_subset_seed=0,
+                 cdfg: bool = False,
+                 ablation_vocab: AblationVocab = AblationVocab.NONE):
         """
         Args:
             train_subset: [start_percentile, stop_percentile)    default [0,100).
                             sample a random (but fixed) train set of data in slice by percent, with given seed.
             train_subset_seed: seed for the train_subset fixed random permutation.
-
+            cdfg: Use the CDFG graph format and vocabulary.
         """
         self.split = split
         self.train_subset = train_subset
         self.train_subset_seed = train_subset_seed
+        self.cdfg = cdfg
+        self.ablation_vocab = ablation_vocab
         super().__init__(root, transform, pre_transform)
 
         assert split in ['train', 'val', 'test']
@@ -910,7 +995,7 @@ class POJ104Dataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        base = f'{self.split}_data.pt'
+        base = filename(self.split, self.cdfg, self.ablation_vocab)
 
         if tuple(self.train_subset) == (0, 100) or self.split in ['val', 'test']:
             return [base]
@@ -947,7 +1032,7 @@ class POJ104Dataset(InMemoryDataset):
         num_classes = 104
 
         # check if we need to create the full dataset:
-        full_dataset = Path(self.processed_dir) / f'{self.split}_data.pt'
+        full_dataset = Path(self.processed_dir) / filename(self.split, self.cdfg, self.ablation_vocab)
         if full_dataset.is_file():
             assert self.split == 'train', 'here shouldnt be reachable.'
             print(f"Full dataset found. Generating train_subset={self.train_subset} with seed={self.train_subset_seed}")
@@ -960,29 +1045,34 @@ class POJ104Dataset(InMemoryDataset):
         # ~~~~~ we need to create the full dataset ~~~~~~~~~~~
         assert not full_dataset.is_file(), 'shouldnt be'
         processed_path = str(full_dataset)
-
+        
+        # get vocab first
+        vocab = load_vocabulary(CDFG_VOCABULARY if self.cdfg else PROGRAML_VOCABULARY)
+        assert len(vocab) > 0, "vocab is empty :|"
         # read data into huge `Data` list.
         data_list = []
 
         ds_base = Path(self.root)
         print(f'Creating {self.split} dataset at {str(ds_base)}')
 
-        split_folder = ds_base / ('ir_' + self.split)
+        split_folder = ds_base / (self.split)
         assert split_folder.exists(), f"{split_folder} doesn't exist!"
         
-        # collect .ll.p instead and call nx2data on the fly!
-        print(f"=== DATASET {split_folder}: Collecting .ll.p files into dataset")
+        # collect .pb and call nx2data on the fly!
+        print(f"=== DATASET {split_folder}: Collecting ProgramGraph.pb files into dataset")
 
         # only take files from subfolders (with class names!) recursively
-        files = [x for x in split_folder.rglob("*.ll.p") if x.parent.name != split_folder.name]
+        files = [x for x in split_folder.rglob("*ProgramGraph.pb")]
+        assert len(files) > 0, "no files collected. error."
         for file in tqdm.tqdm(files):
             # skip classes that are larger than what config says to enable debugging with less data
-            class_label = int(file.parent.name) - 1  # let classes start from 0.
-            if class_label >= num_classes:
-                continue
+            #class_label = int(file.parent.name) - 1  # let classes start from 0.
+            #if class_label >= num_classes:
+            #    continue
 
-            g = load(file)
-            data = nx2data(g, class_label)
+            g = load(file, cdfg=self.cdfg)
+            data = nx2data(g, vocabulary=vocab, ablate_vocab=self.ablation_vocab,
+                           y_feature_name="poj104_label")
             data_list.append(data)
 
         print(f" * COMPLETED * === DATASET {split_folder}: now pre-filtering...")

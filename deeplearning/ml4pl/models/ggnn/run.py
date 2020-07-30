@@ -321,7 +321,7 @@ class Learner(object):
         elif args.get('--config_json'):
             config_string = args['--config_json']
             # accept single quoted 'json'. This only works bc our json strings are simple enough.
-            config_string = config_string.replace("'", '"').replace('True', 'true').replace('False', 'false')
+            config_string = config_string.replace("\\'", "'").replace("'", '"').replace('True', 'true').replace('False', 'false')
             params = json.loads(config_string)
         return params
 
