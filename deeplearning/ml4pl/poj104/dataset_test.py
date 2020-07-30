@@ -33,3 +33,7 @@ print("Loaded CDFG graph with", len(graph.node), "nodes and", len(graph.edge), "
 if os.path.isdir(DEVMAP):
     dataset.DevmapDataset(root=DEVMAP, split="amd")
     dataset.DevmapDataset(root=DEVMAP, split="amd", cdfg=True)
+
+assert dataset.filename("foo", False, dataset.AblationVocab.NONE) == "foo_data.pt"
+assert dataset.filename("foo", True, dataset.AblationVocab.NONE) == "foo_cdfg_data.pt"
+assert dataset.filename("foo", True, dataset.AblationVocab.NO_VOCAB) == "foo_cdfg_no_vocab_data.pt"
