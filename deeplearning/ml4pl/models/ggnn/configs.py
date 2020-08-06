@@ -15,6 +15,8 @@
 # limitations under the License.
 """C."""
 from typing import List
+from deeplearning.ml4pl.poj104.dataset import AblationVocab
+
 
 class ProGraMLBaseConfig(object):
     def __init__(self):
@@ -40,6 +42,16 @@ class ProGraMLBaseConfig(object):
         self.edge_type_count: int = 3
 
         self.vocab_size: int = 8568
+        self.cdfg_vocab: bool = False
+        
+        # ABLATION OPTIONS
+        # NONE = 0 No ablation - use the full vocabulary (default).
+        # NO_VOCAB = 1 Ignore the vocabulary - every node has an x value of 0.
+        # NODE_TYPE_ONLY = 2 Use a 3-element vocabulary based on the node type:
+        #    0 - Instruction node
+        #    1 - Variable node
+        #    2 - Constant node
+        self.ablation_vocab: AblationVocab = 0  # 0 NONE, 1 NO_VOCAB, 2 NODE_TYPE_ONLY
 
         # inst2vec_embeddings can now be 'none' as well!
         # this reduces the tokens that the network sees to only

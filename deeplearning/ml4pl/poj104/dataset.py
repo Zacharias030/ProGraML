@@ -1,27 +1,25 @@
 # better dataloader
-from pathlib import Path
-import pickle
-import math
-
-import tqdm
-import numpy as np
-import pandas as pd
-import networkx as nx
-from sklearn.model_selection import StratifiedKFold, KFold
-import torch
-from torch_geometric.data import InMemoryDataset, Data
-
 import csv
 import enum
+import math
+import os
+import pickle
 import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, Optional
-from programl.proto.program_graph_pb2 import ProgramGraph
 
+import numpy as np
+import pandas as pd
+import torch
+import tqdm
+from sklearn.model_selection import KFold, StratifiedKFold
+from torch_geometric.data import Data, InMemoryDataset
+
+from programl.proto.program_graph_pb2 import ProgramGraph
 
 # make this file executable from anywhere
 
-import sys, os
 full_path = os.path.realpath(__file__)
 #print(full_path)
 REPO_ROOT = full_path.rsplit('ProGraML', maxsplit=1)[0] + 'ProGraML'
@@ -32,8 +30,8 @@ REPO_ROOT = Path(REPO_ROOT)
 
 
 # The vocabulary files used in the dataflow experiments.
-PROGRAML_VOCABULARY = Path("deeplearning/ml4pl/poj104/programl_vocabulary.csv")
-CDFG_VOCABULARY = Path("deeplearning/ml4pl/poj104/cdfg_vocabulary.csv")
+PROGRAML_VOCABULARY = REPO_ROOT / "deeplearning/ml4pl/poj104/programl_vocabulary.csv"
+CDFG_VOCABULARY = REPO_ROOT / "deeplearning/ml4pl/poj104/cdfg_vocabulary.csv"
 assert PROGRAML_VOCABULARY.is_file(), f"File not found: {PROGRAML_VOCABULARY}"
 assert CDFG_VOCABULARY.is_file(), f"File not found: {CDFG_VOCABULARY}"
 
@@ -49,7 +47,7 @@ assert CDFG_VOCABULARY.is_file(), f"File not found: {CDFG_VOCABULARY}"
 #   4.  bazel build -c opt //programl/cmd:graph2cdfg
 #   5.  cp -v bazel-bin/programl/cmd/graph2cdfg ${THIS_DIR}
 #
-GRAPH2CDFG = Path("deeplearning/ml4pl/poj104/graph2cdfg")
+GRAPH2CDFG = REPO_ROOT / "deeplearning/ml4pl/poj104/graph2cdfg"
 assert GRAPH2CDFG.is_file(), f"File not found: {GRAPH2CDFG}"
 
 
@@ -67,7 +65,7 @@ def load(file: str, cdfg: bool = False) -> ProgramGraph:
     if cdfg:
         graph2cdfg = subprocess.Popen(
             [str(GRAPH2CDFG), '--stdin_fmt=pb', '--stdout_fmt=pb'],
-            stdin=subprocess.PIPE,  stdout=subprocess.PIPE
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
         proto, _ = graph2cdfg.communicate(proto)
         assert not graph2cdfg.returncode, f"CDFG conversion failed: {file}"
@@ -126,7 +124,8 @@ def filename(
     return f"{name}_data.pt"
 
 
-def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
+def nx2data(graph: ProgramGraph,
+            vocabulary: Dict[str, int],
             y_feature_name: Optional[str] = None,
             ignore_profile_info=True,
             ablate_vocab = AblationVocab.NONE):
@@ -178,6 +177,7 @@ def nx2data(graph: ProgramGraph, vocabulary: Dict[str, int],
     
     # maybe collect these data too
     if y_feature_name is not None:
+        print(graph)
         y = torch.tensor(graph.features.feature[y_feature_name].int64_list.value[0]).view(1)  # <1>
         if y_feature_name == "poj104_label":
             y -= 1
@@ -1071,7 +1071,9 @@ class POJ104Dataset(InMemoryDataset):
             #    continue
 
             g = load(file, cdfg=self.cdfg)
-            data = nx2data(g, vocabulary=vocab, ablate_vocab=self.ablation_vocab,
+            data = nx2data(graph=g,
+                           vocabulary=vocab,
+                           ablate_vocab=self.ablation_vocab,
                            y_feature_name="poj104_label")
             data_list.append(data)
 

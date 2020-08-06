@@ -238,22 +238,42 @@ class Learner(object):
         # ~~~~~~~~~~ POJ 104 ~~~~~~~~~~~~~~~~~~~~~
         elif dataset == 'poj104':
             if not self.args.get('--test'):
-                train_dataset = Dataset(root=self.data_dir, split='train', train_subset=self.config.train_subset)
+                train_dataset = Dataset(root=self.data_dir,
+                                        split='train',
+                                        train_subset=self.config.train_subset,
+                                        cdfg=self.config.cdfg_vocab,
+                                        ablation_vocab=self.config.ablation_vocab)
                 self.train_data = DataLoader(train_dataset,
                                              batch_size=self.config.batch_size,
                                              shuffle=True,
                                              #max_num_nodes=self.config.max_num_nodes
                                             )
 
-            self.valid_data = DataLoader(Dataset(root=self.data_dir, split='val'), batch_size=self.config.batch_size * 2, shuffle=False)
-            self.test_data = DataLoader(Dataset(root=self.data_dir, split='test'), batch_size=self.config.batch_size * 2, shuffle=False)
+            self.valid_data = DataLoader(Dataset(root=self.data_dir,
+                                                 split='val',
+                                                 cdfg=self.config.cdfg_vocab,
+                                                 ablation_vocab=self.config.ablation_vocab),
+                                            batch_size=self.config.batch_size * 2,
+                                            shuffle=False
+                                         )
+            self.test_data = DataLoader(Dataset(root=self.data_dir,
+                                                split='test',
+                                                cdfg=self.config.cdfg_vocab,
+                                                ablation_vocab=self.config.ablation_vocab),
+                                            batch_size=self.config.batch_size * 2,
+                                            shuffle=False
+                                        )
 
         # ~~~~~~~~~~ DEVMAP ~~~~~~~~~~~~~~~~~~~~~
         elif dataset in ['devmap_amd', 'devmap_nvidia']:
             assert kfold and current_kfold_split is not None, "Devmap only supported with kfold flag!"
             assert current_kfold_split < 10
             # get the whole dataset then get the correct split
-            ds = Dataset(root=self.data_dir, split=split, train_subset=self.config.train_subset)
+            ds = Dataset(root=self.data_dir,
+                         split=split,
+                         train_subset=self.config.train_subset,
+                         cdfg=self.config.cdfg,
+                         ablation_vocab=self.config.ablation_vocab)
             train_dataset, valid_dataset = ds.return_cross_validation_splits(current_kfold_split)
 
             self.train_data = None
