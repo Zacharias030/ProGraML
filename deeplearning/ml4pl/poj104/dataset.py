@@ -57,12 +57,20 @@ def load(file: str, cdfg: bool = False) -> ProgramGraph:
     Args:
         file: The path of the ProgramGraph protocol buffer to load.
         cdfg: If true, convert the graph to CDFG during load.
+    Returns:
+        graph: the proto of the programl / CDFG graph
+        orig_graph: the original programl proto (that contains graph level labels)
     """
     graph = ProgramGraph()
     with open(file, 'rb') as f:
         proto = f.read()
 
+    
     if cdfg:
+        # hotfix missing graph labels in cdfg proto
+        orig_graph = ProgramGraph()
+        orig_graph.ParseFromString(proto)
+
         graph2cdfg = subprocess.Popen(
             [str(GRAPH2CDFG), '--stdin_fmt=pb', '--stdout_fmt=pb'],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE
@@ -71,7 +79,10 @@ def load(file: str, cdfg: bool = False) -> ProgramGraph:
         assert not graph2cdfg.returncode, f"CDFG conversion failed: {file}"
 
     graph.ParseFromString(proto)
-    return graph
+    
+    if not cdfg:
+        orig_graph = graph    
+    return graph, orig_graph
 
 
 def load_vocabulary(path: Path):
@@ -128,7 +139,8 @@ def nx2data(graph: ProgramGraph,
             vocabulary: Dict[str, int],
             y_feature_name: Optional[str] = None,
             ignore_profile_info=True,
-            ablate_vocab = AblationVocab.NONE):
+            ablate_vocab = AblationVocab.NONE,
+            orig_graph: ProgramGraph = None):
     r"""Converts a program graph protocol buffer to a
     :class:`torch_geometric.data.Data` instance.
 
@@ -137,6 +149,7 @@ def nx2data(graph: ProgramGraph,
         vocabulary      A map from node text to vocabulary indices.
         y_feature_name  The name of the graph-level feature to use as class label.
         ablate_vocab    Whether to use an ablation vocabulary.
+        orig_graph      A program graph protocol buffer that has graph level labels.
     """
 
     # collect edge_index
@@ -177,8 +190,8 @@ def nx2data(graph: ProgramGraph,
     
     # maybe collect these data too
     if y_feature_name is not None:
-        print(graph)
-        y = torch.tensor(graph.features.feature[y_feature_name].int64_list.value[0]).view(1)  # <1>
+        assert orig_graph is not None, "need orig_graph to retrieve graph level labels!"
+        y = torch.tensor(orig_graph.features.feature[y_feature_name].int64_list.value[0]).view(1)  # <1>
         if y_feature_name == "poj104_label":
             y -= 1
         data_dict['y'] = y
@@ -926,7 +939,7 @@ class DevmapDataset(InMemoryDataset):
         for i in tqdm.tqdm(range(num_files)):
             filename = input_files[i]
 
-            proto = load(filename, cdfg=self.cdfg)
+            proto, _ = load(filename, cdfg=self.cdfg)
             data = nx2data(proto, vocabulary=vocab, ablate_vocab=self.ablation_vocab)
 
             # graph2cdfg conversion drops the graph features, so we may have to 
@@ -1070,11 +1083,12 @@ class POJ104Dataset(InMemoryDataset):
             #if class_label >= num_classes:
             #    continue
 
-            g = load(file, cdfg=self.cdfg)
+            g, orig_graph = load(file, cdfg=self.cdfg)
             data = nx2data(graph=g,
                            vocabulary=vocab,
                            ablate_vocab=self.ablation_vocab,
-                           y_feature_name="poj104_label")
+                           y_feature_name="poj104_label",
+                           orig_graph=orig_graph)
             data_list.append(data)
 
         print(f" * COMPLETED * === DATASET {split_folder}: now pre-filtering...")
