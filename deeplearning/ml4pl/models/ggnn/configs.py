@@ -59,6 +59,8 @@ class ProGraMLBaseConfig(object):
         #  One of {zero, constant, random, random_const, finetune, none}
         self.inst2vec_embeddings = 'random'
 
+        self.ablate_structure = None  # one of {control,data,call}
+
     @classmethod
     def from_dict(cls, params):
         """instantiate Config from params dict that overrides default values where given."""

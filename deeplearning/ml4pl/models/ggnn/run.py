@@ -351,7 +351,19 @@ class Learner(object):
 
         edge_lists = []
         edge_positions = [] if getattr(self.config, 'position_embeddings', False) else None
-        for i in range(3):
+
+        edge_indices = list(range(3))
+        if self.config.ablate_structure:
+            if self.config.ablate_structure == 'control':
+                edge_indices[0] = -1
+            elif self.config.ablate_structure == 'data':
+                edge_indices[1] = -1
+            elif self.config.ablate_structure == 'call':
+                edge_indices[2] = -1
+            else:
+                raise ValueError("unreachable")
+
+        for i in edge_indices:
             # mask by edge type
             mask = batch.edge_attr[:, 0] == i          # <M_i>
             edge_list = batch.edge_index[:, mask].t()  # <et, M_i>
