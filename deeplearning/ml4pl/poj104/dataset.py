@@ -131,6 +131,9 @@ def filename(
     if cdfg:
         name = f"{name}_cdfg"
     if ablation_vocab != AblationVocab.NONE:
+        # transform if ablation_vocab was passed as int.
+        if type(ablation_vocab) == int:
+            ablation_vocab = AblationVocab(ablation_vocab)
         name = f"{name}_{ablation_vocab.name.lower()}"
     return f"{name}_data.pt"
 
